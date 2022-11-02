@@ -1,0 +1,27 @@
+/dist
+/build
+/venv
+*.egg
+*.egg-info
+*.pyc
+*.mo
+.DS_Store
+
+# Editor artifacts
+/.idea
+/.project
+/.pydevproject
+
+# Testing artifacts
+
+TEST-*.xml
+coverage.xml
+test_report.xml
+.cache/
+.pytest_cache/
+
+# documentation
+docs/_build/
+docs/drfapi/
+
+/static
