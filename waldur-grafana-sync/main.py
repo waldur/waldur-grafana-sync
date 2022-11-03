@@ -18,7 +18,7 @@ if __name__ == "__main__":
             sync = Sync()
             logger.info(f'Start of Grafana sync.')
 
-            sync.sync_staff_teams()
+            sync.run()
 
         except Exception as e:
             logger.exception(f"Grafana synchronization error. Message: {e}.")

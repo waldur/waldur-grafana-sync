@@ -1,26 +1,14 @@
 import os
 import secrets
 import string
-from dataclasses import dataclass
 from urllib.parse import urlparse
 
-from grafana_api.grafana_face import GrafanaFace
 from grafana_api.grafana_api import GrafanaClientError
+from grafana_api.grafana_face import GrafanaFace
 
 BACKEND_API_URL = os.environ['BACKEND_API_URL']
 BACKEND_API_USER = os.environ['BACKEND_API_USER']
 BACKEND_API_PASSWORD = os.environ['BACKEND_API_PASSWORD']
-
-
-@dataclass
-class User:
-    id: str
-    login: str
-    email: str
-    name: str = ''
-    is_admin: bool = False
-    is_support: bool = False
-    is_disabled: bool = True
 
 
 class Backend:
@@ -38,6 +26,18 @@ class Backend:
 
     def list_teams(self, name=None):
         return self.manager.teams.search_teams(name)
+
+    def delete_teams(self, id_or_name):
+        try:
+            team_id = int(id_or_name)
+        except ValueError:
+            team = self.manager.teams.get_team_by_name(id_or_name)
+
+            if not team or len(team) > 1:
+                return
+
+            team_id = team[0]['id']
+        return self.manager.teams.delete_team(team_id)
 
     def get_team_members(self, team_id):
         return self.manager.teams.get_team_members(team_id)
