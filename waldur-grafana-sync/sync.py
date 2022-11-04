@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import sys
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -21,6 +22,8 @@ WALDUR_API_TOKEN = os.environ['WALDUR_API_TOKEN']
 REGISTRATION_METHOD = os.environ.get('REGISTRATION_METHOD', 'eduteams')
 STAFF_TEAM_NAME = os.environ.get('STAFF_TEAM_NAME', 'staff')
 SUPPORT_TEAM_NAME = os.environ.get('SUPPORT_TEAM_NAME', 'support')
+
+PROTECTED_LOGINS = re.split(r'\W+', os.environ.get('ADMIN_LOGIN', 'admin')) + [BACKEND_API_USER]
 
 
 @dataclass
@@ -102,7 +105,7 @@ class Sync:
         grafana_users = self.grafana_client.list_users()
         for grafana_user in grafana_users:
             if grafana_user['email'] not in [waldur_user.email for waldur_user in self.waldur_users] and \
-                    grafana_user['login'] != BACKEND_API_USER:
+                    grafana_user['login'] not in PROTECTED_LOGINS:
                 self.grafana_client.delete_user(grafana_user['id'])
                 logger.info(f'User {grafana_user["email"]} has been deleted.')
 
