@@ -25,6 +25,8 @@ SUPPORT_TEAM_NAME = os.environ.get('SUPPORT_TEAM_NAME', 'support')
 PROTECTED_USERNAMES = os.environ.get('PROTECTED_USERNAMES', 'admin,' + BACKEND_API_USER).split(',')
 PROTECTED_TEAMS = os.environ.get('PROTECTED_TEAMS', 'Development,Management').split(',')
 
+DRY_RUN = True
+
 
 @dataclass
 class Organisation:
@@ -81,6 +83,10 @@ class Sync:
                 Organisation(p['customer_uuid'], p['customer_name'], p.get('customer_division_name', ''))
                 for p in item['customer_permissions'] if p['role'] == 'owner'
             ]
+            # temporary workaround till waldur API is updated
+            for o in organizations:
+                if o.division == '':
+                    o.division = self.waldur_client.get_customer(o.uuid).get('division_name', '')
 
             if not item['is_staff'] and not item['is_support'] and not organizations:
                 continue
@@ -103,21 +109,24 @@ class Sync:
         waldur_usernames = [waldur_user.username for waldur_user in self.waldur_users]
         for grafana_user in grafana_users:
             if grafana_user['login'] not in waldur_usernames and grafana_user['login'] not in PROTECTED_USERNAMES:
-                self.grafana_client.delete_user(grafana_user['id'])
-                logger.info(f'User {grafana_user["login"]} has been deleted.')
+                if not DRY_RUN:
+                    self.grafana_client.delete_user(grafana_user['id'])
+                logger.info(f'User {grafana_user["login"]} / {grafana_user["email"]} has been deleted.')
 
         for waldur_user in self.waldur_users:
             if waldur_user.username not in [grafana_user['login'] for grafana_user in grafana_users]:
-                self.grafana_client.create_user(
-                    email=waldur_user.email,
-                    name=waldur_user.name,
-                    login=waldur_user.username
-                )
-                logger.info(f'User {waldur_user.email} has been created.')
+                if not DRY_RUN:
+                    self.grafana_client.create_user(
+                        email=waldur_user.email,
+                        name=waldur_user.name,
+                        login=waldur_user.username
+                    )
+                logger.info(f'User {waldur_user.username} / {waldur_user.email} has been created.')
 
     def _sync_teams(self, team_name, waldur_users):
         if not self.grafana_client.list_teams(team_name):
-            team_id = self.grafana_client.create_team(team_name)['teamId']
+            if not DRY_RUN:
+                team_id = self.grafana_client.create_team(team_name)['teamId']
             logger.info(f'Team {team_name} has been created.')
         else:
             team_id = self.grafana_client.list_teams(team_name)[0]['id']
@@ -126,13 +135,15 @@ class Sync:
 
         for member in members:
             if member['login'] not in [s.username for s in waldur_users]:
-                self.grafana_client.remove_team_member(team_id, member['userId'])
-                logger.info(f'User {member["login"]} has been deleted from members of {team_name}.')
+                if not DRY_RUN:
+                    self.grafana_client.remove_team_member(team_id, member['userId'])
+                logger.info(f'User {member["login"]} / {member["email"]} has been deleted from members of {team_name}.')
 
         for s in waldur_users:
             if s.username not in [member['login'] for member in members]:
-                self.grafana_client.create_team_member(team_id, s.name, s.login, s.email)
-                logger.info(f'User {s.username} has been added to members of {team_name}.')
+                if not DRY_RUN:
+                    self.grafana_client.create_team_member(team_id, s.name, s.login, s.email)
+                logger.info(f'User {s.username} / {s.email} has been added to members of {team_name}.')
 
     def sync_staff_team(self):
         self._sync_teams(
@@ -152,13 +163,10 @@ class Sync:
         for user in self.waldur_users:
             for o in user.organizations:
 
-                if [u for u in teams.get(o.name, []) if u.login == user.username]:
+                if [u for u in teams.get(o.division, []) if u.username == user.username]:
                     continue
 
-                teams[o.name] = teams.get(o.name, []) + [user]
-
-                if o.division:
-                    teams[o.division] = teams.get(o.name, []) + [user]
+                teams[o.division] = teams.get(o.division, []) + [user]
 
         for team_name in teams.keys():
             self._sync_teams(
@@ -169,5 +177,6 @@ class Sync:
         for grafana_team in self.grafana_client.list_teams():
             if grafana_team['name'] not in teams.keys() \
                     and grafana_team['name'] not in [STAFF_TEAM_NAME, SUPPORT_TEAM_NAME] + PROTECTED_TEAMS:
-                self.grafana_client.delete_teams(grafana_team['name'])
+                if not DRY_RUN:
+                    self.grafana_client.delete_teams(grafana_team['name'])
                 logger.info(f'Team {grafana_team["name"]} has been deleted.')
