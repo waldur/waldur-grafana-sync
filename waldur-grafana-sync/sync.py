@@ -1,6 +1,5 @@
 import logging
 import os
-import re
 import sys
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -23,7 +22,8 @@ REGISTRATION_METHOD = os.environ.get('REGISTRATION_METHOD', 'eduteams')
 STAFF_TEAM_NAME = os.environ.get('STAFF_TEAM_NAME', 'staff')
 SUPPORT_TEAM_NAME = os.environ.get('SUPPORT_TEAM_NAME', 'support')
 
-PROTECTED_LOGINS = re.split(r'\W+', os.environ.get('ADMIN_LOGIN', 'admin')) + [BACKEND_API_USER]
+PROTECTED_USERNAMES = os.environ.get('PROTECTED_USERNAMES', 'admin,' + BACKEND_API_USER).split(',')
+PROTECTED_TEAMS = os.environ.get('PROTECTED_TEAMS', 'Development,Management').split(',')
 
 
 @dataclass
@@ -36,7 +36,7 @@ class Organisation:
 @dataclass
 class User:
     uuid: str
-    login: str
+    username: str
     email: str
     name: str
     is_staff: bool
@@ -61,11 +61,11 @@ class Sync:
 
     @property
     def waldur_staff_users(self):
-        return [user for user in self.waldur_users if user.is_staff is True]
+        return [user for user in self.waldur_users if user.is_staff]
 
     @property
     def waldur_support_users(self):
-        return [user for user in self.waldur_users if user.is_support is True]
+        return [user for user in self.waldur_users if user.is_support]
 
     @cached_property
     def waldur_users(self):
@@ -73,16 +73,14 @@ class Sync:
         query = {
             'registration_method': REGISTRATION_METHOD,
             'is_active': True,
+            'field': ['customer_permissions', 'is_staff', 'is_support', 'username', 'uuid', 'full_name', 'email'],
         }
 
         for item in self.waldur_client.list_users(query):
             organizations = [
-                Organisation(p['customer_uuid'], p['customer_name'])
+                Organisation(p['customer_uuid'], p['customer_name'], p.get('customer_division_name', ''))
                 for p in item['customer_permissions'] if p['role'] == 'owner'
             ]
-
-            for organization in organizations:
-                organization.division = self.waldur_client.get_customer(organization.uuid).get('division_name', '')
 
             if not item['is_staff'] and not item['is_support'] and not organizations:
                 continue
@@ -90,7 +88,7 @@ class Sync:
             result.append(
                 User(
                     uuid=item['uuid'],
-                    login=item['username'],
+                    username=item['username'],
                     email=item['email'],
                     name=item['full_name'],
                     is_staff=item['is_staff'],
@@ -102,18 +100,18 @@ class Sync:
 
     def sync_users(self):
         grafana_users = self.grafana_client.list_users()
+        waldur_usernames = [waldur_user.username for waldur_user in self.waldur_users]
         for grafana_user in grafana_users:
-            if grafana_user['email'] not in [waldur_user.email for waldur_user in self.waldur_users] and \
-                    grafana_user['login'] not in PROTECTED_LOGINS:
+            if grafana_user['login'] not in waldur_usernames and grafana_user['login'] not in PROTECTED_USERNAMES:
                 self.grafana_client.delete_user(grafana_user['id'])
-                logger.info(f'User {grafana_user["email"]} has been deleted.')
+                logger.info(f'User {grafana_user["login"]} has been deleted.')
 
         for waldur_user in self.waldur_users:
-            if waldur_user.email not in [grafana_user['email'] for grafana_user in grafana_users]:
+            if waldur_user.username not in [grafana_user['login'] for grafana_user in grafana_users]:
                 self.grafana_client.create_user(
                     email=waldur_user.email,
                     name=waldur_user.name,
-                    login=waldur_user.login
+                    login=waldur_user.username
                 )
                 logger.info(f'User {waldur_user.email} has been created.')
 
@@ -127,27 +125,25 @@ class Sync:
         members = self.grafana_client.get_team_members(team_id)
 
         for member in members:
-            if member['email'] not in [s.email for s in waldur_users]:
+            if member['login'] not in [s.username for s in waldur_users]:
                 self.grafana_client.remove_team_member(team_id, member['userId'])
-                logger.info(f'User {member["email"]} has been deleted from members of {team_name}.')
+                logger.info(f'User {member["login"]} has been deleted from members of {team_name}.')
 
         for s in waldur_users:
-            if s.email not in [member['email'] for member in members]:
+            if s.username not in [member['login'] for member in members]:
                 self.grafana_client.create_team_member(team_id, s.name, s.login, s.email)
-                logger.info(f'User {s.email} has been added to members of {team_name}.')
+                logger.info(f'User {s.username} has been added to members of {team_name}.')
 
     def sync_staff_team(self):
         self._sync_teams(
             team_name=STAFF_TEAM_NAME,
             waldur_users=self.waldur_staff_users,
-
         )
 
     def sync_support_team(self):
         self._sync_teams(
             team_name=SUPPORT_TEAM_NAME,
             waldur_users=self.waldur_support_users,
-
         )
 
     def sync_organization_teams(self):
@@ -156,7 +152,7 @@ class Sync:
         for user in self.waldur_users:
             for o in user.organizations:
 
-                if [u for u in teams.get(o.name, []) if u.email == user.email]:
+                if [u for u in teams.get(o.name, []) if u.login == user.username]:
                     continue
 
                 teams[o.name] = teams.get(o.name, []) + [user]
@@ -168,11 +164,10 @@ class Sync:
             self._sync_teams(
                 team_name=team_name,
                 waldur_users=teams[team_name],
-
             )
 
         for grafana_team in self.grafana_client.list_teams():
             if grafana_team['name'] not in teams.keys() \
-                    and grafana_team['name'] not in (STAFF_TEAM_NAME, SUPPORT_TEAM_NAME):
+                    and grafana_team['name'] not in [STAFF_TEAM_NAME, SUPPORT_TEAM_NAME] + PROTECTED_TEAMS:
                 self.grafana_client.delete_teams(grafana_team['name'])
                 logger.info(f'Team {grafana_team["name"]} has been deleted.')
