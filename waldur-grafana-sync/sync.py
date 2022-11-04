@@ -72,7 +72,6 @@ class Sync:
         result = []
         query = {
             'registration_method': REGISTRATION_METHOD,
-            'page_size': 10000,
             'is_active': True,
         }
 
