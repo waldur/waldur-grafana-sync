@@ -6,7 +6,7 @@ from functools import cached_property
 
 from waldur_client import WaldurClient
 
-from backend import Backend
+from backend import Backend, BACKEND_API_USER
 
 handler = logging.StreamHandler(sys.stdout)
 logger = logging.getLogger(__name__)
@@ -21,7 +21,6 @@ WALDUR_API_TOKEN = os.environ['WALDUR_API_TOKEN']
 REGISTRATION_METHOD = os.environ.get('REGISTRATION_METHOD', 'eduteams')
 STAFF_TEAM_NAME = os.environ.get('STAFF_TEAM_NAME', 'staff')
 SUPPORT_TEAM_NAME = os.environ.get('SUPPORT_TEAM_NAME', 'support')
-ADMIN_LOGIN = os.environ.get('ADMIN_LOGIN', 'admin')
 
 
 @dataclass
@@ -103,7 +102,7 @@ class Sync:
         grafana_users = self.grafana_client.list_users()
         for grafana_user in grafana_users:
             if grafana_user['email'] not in [waldur_user.email for waldur_user in self.waldur_users] and \
-                    grafana_user['login'] != ADMIN_LOGIN:
+                    grafana_user['login'] != BACKEND_API_USER:
                 self.grafana_client.delete_user(grafana_user['id'])
                 logger.info(f'User {grafana_user["email"]} has been deleted.')
 
