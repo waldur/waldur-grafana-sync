@@ -1,0 +1,2 @@
+git+https://github.com/waldur/python-waldur-client.git
+grafana-api==1.0.3
