@@ -105,6 +105,7 @@ class Sync:
             if grafana_user['email'] not in [waldur_user.email for waldur_user in self.waldur_users] and \
                     grafana_user['login'] != ADMIN_LOGIN:
                 self.grafana_client.delete_user(grafana_user['id'])
+                logger.info(f'User {grafana_user["email"]} has been deleted.')
 
         for waldur_user in self.waldur_users:
             if waldur_user.email not in [grafana_user['email'] for grafana_user in grafana_users]:
@@ -113,10 +114,12 @@ class Sync:
                     name=waldur_user.name,
                     login=waldur_user.login
                 )
+                logger.info(f'User {waldur_user.email} has been created.')
 
     def _sync_teams(self, team_name, waldur_users):
         if not self.grafana_client.list_teams(team_name):
             team_id = self.grafana_client.create_team(team_name)['teamId']
+            logger.info(f'Team {team_name} has been created.')
         else:
             team_id = self.grafana_client.list_teams(team_name)[0]['id']
 
@@ -125,10 +128,12 @@ class Sync:
         for member in members:
             if member['email'] not in [s.email for s in waldur_users]:
                 self.grafana_client.remove_team_member(team_id, member['userId'])
+                logger.info(f'User {member["email"]} has been deleted from members of {team_name}.')
 
         for s in waldur_users:
             if s.email not in [member['email'] for member in members]:
                 self.grafana_client.create_team_member(team_id, s.name, s.login, s.email)
+                logger.info(f'User {s.email} has been added to members of {team_name}.')
 
     def sync_staff_team(self):
         self._sync_teams(
@@ -169,3 +174,4 @@ class Sync:
             if grafana_team['name'] not in teams.keys() \
                     and grafana_team['name'] not in (STAFF_TEAM_NAME, SUPPORT_TEAM_NAME):
                 self.grafana_client.delete_teams(grafana_team['name'])
+                logger.info(f'Team {grafana_team["name"]} has been deleted.')

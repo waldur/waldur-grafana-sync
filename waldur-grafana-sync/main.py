@@ -1,7 +1,7 @@
 from time import sleep
 import logging
 
-from .sync import Sync
+from sync import Sync
 
 logging.getLogger("requests").setLevel(logging.WARNING)
 logging.basicConfig(
@@ -17,8 +17,8 @@ if __name__ == "__main__":
         try:
             sync = Sync()
             logger.info(f'Start of Grafana sync.')
-
             sync.run()
+            logger.info(f'End of Grafana sync.')
 
         except Exception as e:
             logger.exception(f"Grafana synchronization error. Message: {e}.")
