@@ -25,7 +25,7 @@ SUPPORT_TEAM_NAME = os.environ.get('SUPPORT_TEAM_NAME', 'support')
 PROTECTED_USERNAMES = os.environ.get('PROTECTED_USERNAMES', 'admin,' + BACKEND_API_USER).split(',')
 PROTECTED_TEAMS = os.environ.get('PROTECTED_TEAMS', 'Development,Management').split(',')
 
-DRY_RUN = True
+DRY_RUN = False
 
 
 @dataclass
@@ -137,13 +137,13 @@ class Sync:
             if member['login'] not in [s.username for s in waldur_users]:
                 if not DRY_RUN:
                     self.grafana_client.remove_team_member(team_id, member['userId'])
-                logger.info(f'User {member["login"]} / {member["email"]} has been deleted from members of {team_name}.')
+                logger.info(f'User {member["login"]} / {member["email"]} has been deleted from members of {team_name} / {team_id}.')
 
         for s in waldur_users:
             if s.username not in [member['login'] for member in members]:
                 if not DRY_RUN:
-                    self.grafana_client.create_team_member(team_id, s.name, s.login, s.email)
-                logger.info(f'User {s.username} / {s.email} has been added to members of {team_name}.')
+                    self.grafana_client.create_team_member(team_id, s.name, s.username, s.email)
+                logger.info(f'User {s.username} / {s.email} has been added to members of {team_name} / {team_id}.')
 
     def sync_staff_team(self):
         self._sync_teams(
@@ -164,6 +164,8 @@ class Sync:
             for o in user.organizations:
 
                 if [u for u in teams.get(o.division, []) if u.username == user.username]:
+                    continue
+                if o.division == '':
                     continue
 
                 teams[o.division] = teams.get(o.division, []) + [user]
