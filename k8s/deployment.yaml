@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: waldur-grafana-sync
+spec:
+  selector:
+    matchLabels:
+      app: waldur-grafana-sync
+  template:
+    metadata:
+      labels:
+        app: waldur-grafana-sync
+    spec:
+      containers:
+        - name: waldur-grafana-sync
+          image: registry.hpc.ut.ee/mirror/opennode/waldur-grafana-sync:latest
+          imagePullPolicy: Always
+          env:
+            - name: BACKEND_API_URL
+              value: https://puhuri-stats.neic.no/
+            - name: BACKEND_API_USER
+              value: waldur-integration-user
+            - name: PROTECTED_TEAMS
+              value: Development,Management,Puhuri team
+            - name: BACKEND_API_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: waldur-grafana-sync-secret
+                  key: BACKEND_API_PASSWORD
+            - name: WALDUR_API_URL
+              value: https://puhuri-core.neic.no/api/
+            - name: WALDUR_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: waldur-grafana-sync-secret
+                  key: WALDUR_API_TOKEN
+          resources:
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
