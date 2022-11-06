@@ -7,4 +7,4 @@ COPY . /usr/src/waldur-grafana-sync
 WORKDIR /usr/src/waldur-grafana-sync
 RUN pip install -r requirements.txt --no-cache-dir
 
-CMD [ "python", "waldur_grafana_sync/main.py" ]
+CMD [ "python", "main.py" ]
