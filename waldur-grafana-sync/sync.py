@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import uuid
 from dataclasses import dataclass, field
 from functools import cached_property
 
@@ -32,8 +33,10 @@ DRY_RUN = False
 class Organisation:
     uuid: str
     name: str
-    division: str = ''
-
+    division: str
+    abbreviation: str = ''
+    country: str = ''
+    is_service_provider: bool = False
 
 @dataclass
 class User:
@@ -46,6 +49,18 @@ class User:
     organizations: list[Organisation] = field(default_factory=list)
 
 
+def is_uuid_like(val):
+    """
+    Check if value looks like a valid UUID.
+    """
+    try:
+        uuid.UUID(val)
+    except (TypeError, ValueError, AttributeError):
+        return False
+    else:
+        return True
+
+
 class Sync:
     @cached_property
     def grafana_client(self):
@@ -56,6 +71,7 @@ class Sync:
         return WaldurClient(WALDUR_API_URL, WALDUR_API_TOKEN)
 
     def run(self):
+        self.sync_organizations()
         self.sync_users()
         self.sync_staff_team()
         self.sync_support_team()
@@ -68,6 +84,19 @@ class Sync:
     @property
     def waldur_support_users(self):
         return [user for user in self.waldur_users if user.is_support]
+
+    @cached_property
+    def waldur_organizations(self):
+        result = {}
+        query = {
+            'archived': False,
+            'is_active': True,
+            'field': ['name', 'abbreviation', 'country', 'division_name', 'uuid', 'is_service_provider'],
+        }
+
+        return {
+            c['uuid']: Organisation(c['uuid'], c['name'], c.get('division_name', ''), c['abbreviation'], c['country'],
+                                    c['is_service_provider']) for c in self.waldur_client.list_customers(query)}
 
     @cached_property
     def waldur_users(self):
@@ -103,6 +132,29 @@ class Sync:
                 )
             )
         return result
+
+    def sync_organizations(self):
+        # assure that for each organization in waldur we have a folder
+        grafana_folders = {f['uid']: f['title'] for f in self.grafana_client.list_folders()}
+        for org_uuid in self.waldur_organizations.keys():
+            waldur_org : Organisation = self.waldur_organizations[org_uuid]
+            abbreviation = f' ({waldur_org.abbreviation})' if waldur_org.abbreviation else ''
+            expected_title = f'{waldur_org.name}{abbreviation}'
+            if org_uuid in grafana_folders:
+                # check if name needs updates
+                if grafana_folders[org_uuid] != expected_title:
+                    logger.info(f'Updating folder with UID {org_uuid}. {grafana_folders[org_uuid]} -> {expected_title}')
+                    self.grafana_client.update_folder(org_uuid, expected_title)
+            else:
+                # create a new one
+                logger.info(f'Adding folder {expected_title} with UID {org_uuid}.')
+                self.grafana_client.create_folder(expected_title, org_uuid)
+
+        # cleanup existing folders with UUID like unique keys
+        for folder_uid in grafana_folders.keys():
+            if is_uuid_like(folder_uid) and folder_uid not in self.waldur_organizations:
+                logger.info(f'Removing folder {grafana_folders[folder_uid]} with UID {folder_uid}.')
+                self.grafana_client.delete_folder(folder_uid)
 
     def sync_users(self):
         grafana_users = self.grafana_client.list_users()
