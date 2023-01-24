@@ -21,6 +21,18 @@ class Backend:
             protocol=url.scheme,
         )
 
+    def list_folders(self):
+        return self.manager.folder.get_all_folders()
+
+    def create_folder(self, title, uid=None):
+        return self.manager.folder.create_folder(title, uid)
+
+    def delete_folder(self, uid):
+        return self.manager.folder.delete_folder(uid)
+
+    def update_folder(self, uid, title):
+        return self.manager.folder.update_folder(uid, title, overwrite=True)
+
     def create_team(self, name):
         return self.manager.teams.add_team({'name': name})
 
