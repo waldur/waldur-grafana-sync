@@ -162,7 +162,8 @@ class Sync:
         for grafana_user in grafana_users:
             if grafana_user['login'] not in waldur_usernames and grafana_user['login'] not in PROTECTED_USERNAMES:
                 if not DRY_RUN:
-                    self.grafana_client.delete_user(grafana_user['id'])
+                    logger.info(f'User deletion is TEMPORARY disabled.')
+                    #self.grafana_client.delete_user(grafana_user['id'])
                 logger.info(f'User {grafana_user["login"]} / {grafana_user["email"]} has been deleted.')
 
         for waldur_user in self.waldur_users:
