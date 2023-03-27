@@ -26,8 +26,18 @@ SUPPORT_TEAM_NAME = os.environ.get('SUPPORT_TEAM_NAME', 'support')
 PROTECTED_USERNAMES = os.environ.get('PROTECTED_USERNAMES', 'admin,' + BACKEND_API_USER).split(',')
 PROTECTED_TEAMS = os.environ.get('PROTECTED_TEAMS', 'Development,Management').split(',')
 
+ALL_SPECIAL_TEAMS = [STAFF_TEAM_NAME, SUPPORT_TEAM_NAME] + PROTECTED_TEAMS
 DRY_RUN = False
 
+
+@dataclass
+class User:
+    uuid: str
+    username: str
+    email: str
+    name: str
+    is_staff: bool = False
+    is_support: bool = False
 
 @dataclass
 class Organisation:
@@ -37,16 +47,7 @@ class Organisation:
     abbreviation: str = ''
     country: str = ''
     is_service_provider: bool = False
-
-@dataclass
-class User:
-    uuid: str
-    username: str
-    email: str
-    name: str
-    is_staff: bool
-    is_support: bool
-    organizations: list[Organisation] = field(default_factory=list)
+    owners: list[User] = field(default_factory=list)
 
 
 def is_uuid_like(val):
@@ -71,11 +72,11 @@ class Sync:
         return WaldurClient(WALDUR_API_URL, WALDUR_API_TOKEN)
 
     def run(self):
-        self.sync_organizations()
         self.sync_users()
+        self.sync_organization_teams()
         self.sync_staff_team()
         self.sync_support_team()
-        self.sync_organization_teams()
+        self.sync_folders()
 
     @property
     def waldur_staff_users(self):
@@ -91,12 +92,19 @@ class Sync:
         query = {
             'archived': False,
             'is_active': True,
-            'field': ['name', 'abbreviation', 'country', 'division_name', 'uuid', 'is_service_provider'],
+            'field': ['name', 'abbreviation', 'country', 'division_name', 'uuid', 'owners', 'is_service_provider'],
         }
 
         return {
-            c['uuid']: Organisation(c['uuid'], c['name'], c.get('division_name', ''), c['abbreviation'], c['country'],
-                                    c['is_service_provider']) for c in self.waldur_client.list_customers(query)}
+            c['uuid']: Organisation(
+                c['uuid'],
+                c['name'],
+                c.get('division_name', ''),
+                c['abbreviation'],
+                c['country'],
+                c['is_service_provider'],
+                [User(u['uuid'], u['username'], u['email'], u['full_name']) for u in c['owners']]
+            ) for c in self.waldur_client.list_customers(query)}
 
     @cached_property
     def waldur_users(self):
@@ -112,11 +120,6 @@ class Sync:
                 Organisation(p['customer_uuid'], p['customer_name'], p.get('customer_division_name', ''))
                 for p in item['customer_permissions'] if p['role'] == 'owner'
             ]
-            # temporary workaround till waldur API is updated
-            for o in organizations:
-                if o.division == '':
-                    o.division = self.waldur_client.get_customer(o.uuid).get('division_name', '')
-
             if not item['is_staff'] and not item['is_support'] and not organizations:
                 continue
 
@@ -128,16 +131,18 @@ class Sync:
                     name=item['full_name'],
                     is_staff=item['is_staff'],
                     is_support=item['is_support'],
-                    organizations=organizations,
                 )
             )
         return result
 
-    def sync_organizations(self):
+    def ensure_folder_permissions(self, folder_team_title, org_uuid):
+        folder = self.grafana_client
+
+    def sync_folders(self):
         # assure that for each organization in waldur we have a folder
         grafana_folders = {f['uid']: f['title'] for f in self.grafana_client.list_folders()}
         for org_uuid in self.waldur_organizations.keys():
-            waldur_org : Organisation = self.waldur_organizations[org_uuid]
+            waldur_org: Organisation = self.waldur_organizations[org_uuid]
             abbreviation = f' ({waldur_org.abbreviation})' if waldur_org.abbreviation else ''
             expected_title = f'{waldur_org.name}{abbreviation}'
             if org_uuid in grafana_folders:
@@ -149,18 +154,26 @@ class Sync:
                 # create a new one
                 logger.info(f'Adding folder {expected_title} with UID {org_uuid}.')
                 self.grafana_client.create_folder(expected_title, org_uuid)
+            # make sure that corresponding tean has read access to a folder
+            self.grafana_client.add_folder_team_permission(org_uuid, expected_title)
 
         # cleanup existing folders with UUID like unique keys
         for folder_uid in grafana_folders.keys():
             if is_uuid_like(folder_uid) and folder_uid not in self.waldur_organizations:
                 logger.info(f'Removing folder {grafana_folders[folder_uid]} with UID {folder_uid}.')
-                self.grafana_client.delete_folder(folder_uid)
+                # TODO: uncomment
+                #self.grafana_client.delete_folder(folder_uid)
+
+    def member_of(self, user_id, teams_list):
+        user_teams = {t['name'] for t in self.grafana_client.list_user_teams(user_id)}
+        return len(user_teams.intersection(teams_list)) > 0
 
     def sync_users(self):
         grafana_users = self.grafana_client.list_users()
         waldur_usernames = [waldur_user.username for waldur_user in self.waldur_users]
         for grafana_user in grafana_users:
-            if grafana_user['login'] not in waldur_usernames and grafana_user['login'] not in PROTECTED_USERNAMES:
+            if grafana_user['login'] not in waldur_usernames and grafana_user['login'] not in PROTECTED_USERNAMES \
+                    and not self.member_of(grafana_user['id'], ALL_SPECIAL_TEAMS):
                 if not DRY_RUN:
                     logger.info(f'User deletion is TEMPORARY disabled.')
                     #self.grafana_client.delete_user(grafana_user['id'])
@@ -185,9 +198,11 @@ class Sync:
             team_id = self.grafana_client.list_teams(team_name)[0]['id']
 
         members = self.grafana_client.get_team_members(team_id)
-
+        all_waldur_usernames = [s.username for s in self.waldur_users]
+        waldur_users = [u for u in waldur_users if u.username in all_waldur_usernames]
+        waldur_username = [s.username for s in waldur_users]
         for member in members:
-            if member['login'] not in [s.username for s in waldur_users]:
+            if member['login'] not in waldur_username:
                 if not DRY_RUN:
                     self.grafana_client.remove_team_member(team_id, member['userId'])
                 logger.info(f'User {member["login"]} / {member["email"]} has been deleted from members of {team_name} / {team_id}.')
@@ -211,27 +226,26 @@ class Sync:
         )
 
     def sync_organization_teams(self):
-        teams = {}
-
-        for user in self.waldur_users:
-            for o in user.organizations:
-
-                if [u for u in teams.get(o.division, []) if u.username == user.username]:
-                    continue
-                if o.division == '':
-                    continue
-
-                teams[o.division] = teams.get(o.division, []) + [user]
-
-        for team_name in teams.keys():
-            self._sync_teams(
-                team_name=team_name,
-                waldur_users=teams[team_name],
-            )
-
-        for grafana_team in self.grafana_client.list_teams():
-            if grafana_team['name'] not in teams.keys() \
-                    and grafana_team['name'] not in [STAFF_TEAM_NAME, SUPPORT_TEAM_NAME] + PROTECTED_TEAMS:
+        grafana_teams = {f['name']: f['id'] for f in self.grafana_client.list_teams()}
+        seen_org_names = []
+        for org_uuid in self.waldur_organizations.keys():
+            waldur_org: Organisation = self.waldur_organizations[org_uuid]
+            abbreviation = f' ({waldur_org.abbreviation})' if waldur_org.abbreviation else ''
+            expected_title = f'{waldur_org.name}{abbreviation}'
+            seen_org_names.append(expected_title)
+            if expected_title not in grafana_teams:
                 if not DRY_RUN:
-                    self.grafana_client.delete_teams(grafana_team['name'])
-                logger.info(f'Team {grafana_team["name"]} has been deleted.')
+                    self.grafana_client.create_team(expected_title)
+                logger.info(f'Team {expected_title} has been created.')
+
+            self._sync_teams(expected_title, waldur_org.owners)
+
+        # cleanup existing folders with UUID like unique keys
+        for team_name in grafana_teams:
+            if team_name not in seen_org_names \
+                    and team_name not in ALL_SPECIAL_TEAMS:
+                if not DRY_RUN:
+                    pass
+                    # TODO: uncomment
+                    # self.grafana_client.delete_teams(team_name)
+                logger.info(f'Team {team_name} has been deleted.')

@@ -33,6 +33,38 @@ class Backend:
     def update_folder(self, uid, title):
         return self.manager.folder.update_folder(uid, title, overwrite=True)
 
+    def add_folder_team_permission(self, uid, team_name):
+        existing_permissions = self.manager.folder.get_folder_permissions(uid)
+        team = self.list_teams(team_name)
+        new_permissions = [{
+            'teamId': team[0]['id'],
+            'permission': 1
+        }]
+        for p in existing_permissions:
+            if 'role' in p:
+                new_permissions.append(
+                    {
+                        "role": p['role'],
+                        "permission": p['permission']
+                    })
+            elif p['userId']:
+                new_permissions.append(
+                    {
+                        "userId": p['userId'],
+                        "permission": p['permission']
+                    },
+                )
+            elif p['teamId']:
+                new_permissions.append(
+                    {
+                        "teamId": p['teamId'],
+                        "permission": p['permission']
+                    },
+                )
+            else:
+                print('Failed to detect permission', p)
+        self.manager.folder.update_folder_permissions(uid, {"items": new_permissions})
+
     def create_team(self, name):
         return self.manager.teams.add_team({'name': name})
 
@@ -78,6 +110,10 @@ class Backend:
 
     def list_users(self):
         return self.manager.users.search_users()
+
+    def list_user_teams(self, user_id):
+        # XXX: Dirty hack, but SDK doesn't have a method for user teams
+        return self.manager.users.get_user(f'{user_id}/teams')
 
     def delete_user(self, user_id):
         return self.manager.admin.delete_user(user_id)
