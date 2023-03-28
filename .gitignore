@@ -6,6 +6,7 @@
 *.pyc
 *.mo
 .DS_Store
+.env
 
 # Editor artifacts
 /.idea
