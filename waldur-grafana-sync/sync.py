@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import sys
@@ -79,6 +80,7 @@ class Sync:
         self.sync_staff_team()
         self.sync_support_team()
         self.sync_folders()
+        self.sync_dashboards()
 
     @property
     def waldur_staff_users(self):
@@ -300,3 +302,28 @@ class Sync:
                     # TODO: uncomment
                     # self.grafana_client.delete_teams(team_name)
                 logger.info(f'Team {team_name} has been deleted.')
+
+    def sync_dashboards(self):
+        self.waldur_organizations.keys()
+        for waldur_org in self.waldur_organizations.values():
+            grafana_dashboards = self.grafana_client.search_dashboards(
+                folder_ids=[waldur_org.uuid], tag='managed'
+            )
+            dashboard = json.loads(
+                self.dashboard_template.replace('$CUSTOMER_NAME$', waldur_org.name)
+            )
+            payload = {
+                'dashboard': dashboard,
+                'folderUid': waldur_org.uuid,
+            }
+            if len(grafana_dashboards) == 0:
+                dashboard = self.grafana_client.create_or_update_dashboard(payload)
+            elif len(grafana_dashboards) == 1:
+                payload['dashboard']['id'] = grafana_dashboards[0]['id']
+                dashboard = self.grafana_client.create_or_update_dashboard(payload)
+            else:
+                print(f'Multiple managed dashboards detected for org {waldur_org.name}')
+
+    @cached_property
+    def dashboard_template(self):
+        return open('./dashboard-usage.json').read()

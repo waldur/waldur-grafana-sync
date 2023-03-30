@@ -1,0 +1,148 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "DSjDRl44k"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "puhuri_project_name"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 309
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 15,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 23,
+      "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "9.3.6",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "DSjDRl44k"
+          },
+          "format": "table",
+          "group": [],
+          "hide": false,
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT \n    \"structure_customer\".\"abbreviation\" as RA, \n    \"structure_project\".\"name\" as puhuri_project_name,\n    \"marketplace_resource\".\"name\", \n    \"marketplace_resource\".\"limits\"->>'cpu_k_hours' AS cpu_limits,\n    \"marketplace_resource\".\"limits\"->>'gb_k_hours' AS storage_limits,\n    \"marketplace_resource\".\"limits\"->>'gpu_hours' AS gpu_limits,\n    \"marketplace_resource\".\"created\",\n    \"structure_project\".\"end_date\",\n    (SELECT SUM(\"marketplace_componentusage\".\"usage\")\n    FROM \"marketplace_componentusage\" INNER JOIN \"marketplace_offeringcomponent\" ON (\"marketplace_componentusage\".\"component_id\" = \"marketplace_offeringcomponent\".\"id\") \n    WHERE (\"marketplace_offeringcomponent\".\"type\" = 'cpu_k_hours' AND \"marketplace_componentusage\".\"resource_id\" = \"marketplace_resource\".\"id\")) as cpu_usage,\n    (SELECT SUM(\"marketplace_componentusage\".\"usage\")\n    FROM \"marketplace_componentusage\" INNER JOIN \"marketplace_offeringcomponent\" ON (\"marketplace_componentusage\".\"component_id\" = \"marketplace_offeringcomponent\".\"id\") \n    WHERE (\"marketplace_offeringcomponent\".\"type\" = 'gb_k_hours' AND \"marketplace_componentusage\".\"resource_id\" = \"marketplace_resource\".\"id\")) as storage_usage,\n    (SELECT SUM(\"marketplace_componentusage\".\"usage\")\n    FROM \"marketplace_componentusage\" INNER JOIN \"marketplace_offeringcomponent\" ON (\"marketplace_componentusage\".\"component_id\" = \"marketplace_offeringcomponent\".\"id\") \n    WHERE (\"marketplace_offeringcomponent\".\"type\" = 'gpu_hours' AND \"marketplace_componentusage\".\"resource_id\" = \"marketplace_resource\".\"id\")) as gpu_usage,\n    \"marketplace_resource\".\"backend_id\",\n    \"marketplace_resource\".\"uuid\" as puhuri_uuid \nFROM \"marketplace_resource\" INNER JOIN \"structure_project\" ON (\"marketplace_resource\".\"project_id\" = \"structure_project\".\"id\") INNER JOIN \"structure_customer\" ON (\"structure_project\".\"customer_id\" = \"structure_customer\".\"id\")\nWHERE \n    \"structure_customer\".\"name\" = '$CUSTOMER_NAME$' \n    AND NOT (\"marketplace_resource\".\"state\" = 6)\n    AND NOT (\"marketplace_resource\".\"limits\"::text = '{}')\nORDER BY \"marketplace_resource\".\"created\" ASC;",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "latitude"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "projects",
+          "timeColumn": "created",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "List of Projects",
+      "type": "table"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 37,
+  "style": "dark",
+  "tags": ["managed"],
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "$CUSTOMER_NAME$ Usage",
+  "weekStart": ""
+}
