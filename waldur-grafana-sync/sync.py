@@ -192,7 +192,7 @@ class Sync:
                 self.grafana_client.create_folder(expected_title, org_uuid)
                 folder_names.add(expected_title)
             # make sure that corresponding tean has read access to a folder
-            self.grafana_client.add_folder_team_permission(org_uuid, expected_title)
+            self.grafana_client.set_folder_permissions(org_uuid, expected_title)
 
         # cleanup existing folders with UUID like unique keys
         for folder_uid in grafana_folders.keys():

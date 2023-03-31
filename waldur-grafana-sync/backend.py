@@ -33,12 +33,16 @@ class Backend:
     def update_folder(self, uid, title):
         return self.manager.folder.update_folder(uid, title, overwrite=True)
 
-    def add_folder_team_permission(self, uid, team_name):
+    def set_folder_permissions(self, uid, team_name):
         existing_permissions = self.manager.folder.get_folder_permissions(uid)
         team = self.list_teams(team_name)
         new_permissions = [{'teamId': team[0]['id'], 'permission': 1}]
         for p in existing_permissions:
             if 'role' in p:
+                # Remove default global read from created grafana folders on sync
+                # See also: https://github.com/grafana/grafana/issues/19172
+                if p['role'] in {'Viewer', 'Editor'}:
+                    continue
                 new_permissions.append(
                     {'role': p['role'], 'permission': p['permission']}
                 )
