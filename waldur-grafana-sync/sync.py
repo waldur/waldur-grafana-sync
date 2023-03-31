@@ -76,11 +76,11 @@ class Sync:
         return WaldurClient(WALDUR_API_URL, WALDUR_API_TOKEN)
 
     def run(self):
-        # self.sync_users()
-        # self.sync_organization_teams()
-        # self.sync_staff_team()
-        # self.sync_support_team()
-        # self.sync_folders()
+        self.sync_users()
+        self.sync_organization_teams()
+        self.sync_staff_team()
+        self.sync_support_team()
+        self.sync_folders()
         self.sync_dashboards()
 
     @property
