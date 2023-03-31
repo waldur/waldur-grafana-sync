@@ -306,11 +306,11 @@ class Sync:
 
     def sync_dashboards(self):
         self.waldur_organizations.keys()
-        grafana_dashboards_list = self.grafana_client.search_dashboards(
-            tag='managed'
-        )
+        grafana_dashboards_list = self.grafana_client.search_dashboards(tag='managed')
         grafana_dashboards_map = {
-            dashboard['folderUid']: dashboard for dashboard in grafana_dashboards_list if 'folderUid' in dashboard
+            dashboard['folderUid']: dashboard
+            for dashboard in grafana_dashboards_list
+            if 'folderUid' in dashboard
         }
         folders = self.grafana_client.list_folders()
         folder_uids = {folder['uid'] for folder in folders}
