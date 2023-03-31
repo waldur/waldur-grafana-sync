@@ -119,3 +119,9 @@ class Backend:
     def _generate_password(self):
         alphabet = string.ascii_letters + string.digits
         return ''.join(secrets.choice(alphabet) for i in range(20))
+
+    def search_dashboards(self, **kwargs):
+        return self.manager.search.search_dashboards(**kwargs)
+
+    def create_or_update_dashboard(self, dashboard):
+        return self.manager.dashboard.update_dashboard(dashboard)

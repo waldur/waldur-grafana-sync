@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import sys
@@ -21,6 +22,7 @@ WALDUR_API_TOKEN = os.environ['WALDUR_API_TOKEN']
 REGISTRATION_METHOD = os.environ.get('REGISTRATION_METHOD', 'eduteams')
 STAFF_TEAM_NAME = os.environ.get('STAFF_TEAM_NAME', 'staff')
 SUPPORT_TEAM_NAME = os.environ.get('SUPPORT_TEAM_NAME', 'support')
+DATASOURCE_UID = os.environ['DATASOURCE_UID']
 
 PROTECTED_USERNAMES = os.environ.get(
     'PROTECTED_USERNAMES', 'admin,' + BACKEND_API_USER
@@ -79,6 +81,7 @@ class Sync:
         self.sync_staff_team()
         self.sync_support_team()
         self.sync_folders()
+        self.sync_dashboards()
 
     @property
     def waldur_staff_users(self):
@@ -300,3 +303,43 @@ class Sync:
                     # TODO: uncomment
                     # self.grafana_client.delete_teams(team_name)
                 logger.info(f'Team {team_name} has been deleted.')
+
+    def sync_dashboards(self):
+        self.waldur_organizations.keys()
+        grafana_dashboards_list = self.grafana_client.search_dashboards(tag='managed')
+        grafana_dashboards_map = {
+            dashboard['folderUid']: dashboard
+            for dashboard in grafana_dashboards_list
+            if 'folderUid' in dashboard
+        }
+        folders = self.grafana_client.list_folders()
+        folder_uids = {folder['uid'] for folder in folders}
+        for waldur_org in self.waldur_organizations.values():
+            if waldur_org.uuid not in folder_uids:
+                continue
+            grafana_dashboard = grafana_dashboards_map.get(waldur_org.uuid)
+            dashboard = json.loads(
+                self.dashboard_template.replace(
+                    '$CUSTOMER_NAME$', waldur_org.name
+                ).replace('$DATASOURCE_UID$', DATASOURCE_UID)
+            )
+            payload = {
+                'dashboard': dashboard,
+                'folderUid': waldur_org.uuid,
+            }
+            if not grafana_dashboard:
+                dashboard = self.grafana_client.create_or_update_dashboard(payload)
+                logger.info(f'Dashboard {waldur_org.name} has been created.')
+            elif grafana_dashboard:
+                payload['dashboard']['uid'] = grafana_dashboard['uid']
+                payload['dashboard']['version'] = (
+                    grafana_dashboard.get('version', 0) + 1
+                )
+                payload['overwrite'] = True
+                dashboard = self.grafana_client.create_or_update_dashboard(payload)
+                logger.info(f'Dashboard {waldur_org.name} has been updated.')
+
+    @cached_property
+    def dashboard_template(self):
+        path = os.path.join(os.path.dirname(__file__), 'dashboard-usage.json')
+        return open(path).read()
