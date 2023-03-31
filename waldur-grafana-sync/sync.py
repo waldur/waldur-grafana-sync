@@ -22,6 +22,7 @@ WALDUR_API_TOKEN = os.environ['WALDUR_API_TOKEN']
 REGISTRATION_METHOD = os.environ.get('REGISTRATION_METHOD', 'eduteams')
 STAFF_TEAM_NAME = os.environ.get('STAFF_TEAM_NAME', 'staff')
 SUPPORT_TEAM_NAME = os.environ.get('SUPPORT_TEAM_NAME', 'support')
+DATASOURCE_UID = os.environ['DATASOURCE_UID']
 
 PROTECTED_USERNAMES = os.environ.get(
     'PROTECTED_USERNAMES', 'admin,' + BACKEND_API_USER
@@ -310,7 +311,9 @@ class Sync:
                 folder_ids=[waldur_org.uuid], tag='managed'
             )
             dashboard = json.loads(
-                self.dashboard_template.replace('$CUSTOMER_NAME$', waldur_org.name)
+                self.dashboard_template
+                    .replace('$CUSTOMER_NAME$', waldur_org.name)
+                    .replace('$DATASOURCE_UID$', DATASOURCE_UID)
             )
             payload = {
                 'dashboard': dashboard,
@@ -326,4 +329,5 @@ class Sync:
 
     @cached_property
     def dashboard_template(self):
-        return open('./dashboard-usage.json').read()
+        path = os.path.join(os.path.dirname(__file__), 'dashboard-usage.json')
+        return open(path).read()

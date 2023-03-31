@@ -1,26 +1,4 @@
 {
-  "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": {
-          "type": "datasource",
-          "uid": "grafana"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "target": {
-          "limit": 100,
-          "matchAny": false,
-          "tags": [],
-          "type": "dashboard"
-        },
-        "type": "dashboard"
-      }
-    ]
-  },
   "description": "",
   "editable": true,
   "fiscalYearStartMonth": 0,
@@ -32,7 +10,7 @@
     {
       "datasource": {
         "type": "postgres",
-        "uid": "DSjDRl44k"
+        "uid": "$DATASOURCE_UID$"
       },
       "fieldConfig": {
         "defaults": {
