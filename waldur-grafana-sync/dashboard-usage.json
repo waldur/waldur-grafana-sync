@@ -76,7 +76,7 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "DSjDRl44k"
+            "uid": "$DATASOURCE_UID$"
           },
           "format": "table",
           "group": [],
