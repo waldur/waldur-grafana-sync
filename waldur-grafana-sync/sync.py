@@ -76,11 +76,11 @@ class Sync:
         return WaldurClient(WALDUR_API_URL, WALDUR_API_TOKEN)
 
     def run(self):
-        self.sync_users()
-        self.sync_organization_teams()
-        self.sync_staff_team()
-        self.sync_support_team()
-        self.sync_folders()
+        # self.sync_users()
+        # self.sync_organization_teams()
+        # self.sync_staff_team()
+        # self.sync_support_team()
+        # self.sync_folders()
         self.sync_dashboards()
 
     @property
@@ -306,26 +306,38 @@ class Sync:
 
     def sync_dashboards(self):
         self.waldur_organizations.keys()
+        grafana_dashboards_list = self.grafana_client.search_dashboards(
+            tag='managed'
+        )
+        grafana_dashboards_map = {
+            dashboard['folderUid']: dashboard for dashboard in grafana_dashboards_list if 'folderUid' in dashboard
+        }
+        folders = self.grafana_client.list_folders()
+        folder_uids = {folder['uid'] for folder in folders}
         for waldur_org in self.waldur_organizations.values():
-            grafana_dashboards = self.grafana_client.search_dashboards(
-                folder_ids=[waldur_org.uuid], tag='managed'
-            )
+            if waldur_org.uuid not in folder_uids:
+                continue
+            grafana_dashboard = grafana_dashboards_map.get(waldur_org.uuid)
             dashboard = json.loads(
-                self.dashboard_template
-                    .replace('$CUSTOMER_NAME$', waldur_org.name)
-                    .replace('$DATASOURCE_UID$', DATASOURCE_UID)
+                self.dashboard_template.replace(
+                    '$CUSTOMER_NAME$', waldur_org.name
+                ).replace('$DATASOURCE_UID$', DATASOURCE_UID)
             )
             payload = {
                 'dashboard': dashboard,
                 'folderUid': waldur_org.uuid,
             }
-            if len(grafana_dashboards) == 0:
+            if not grafana_dashboard:
                 dashboard = self.grafana_client.create_or_update_dashboard(payload)
-            elif len(grafana_dashboards) == 1:
-                payload['dashboard']['id'] = grafana_dashboards[0]['id']
+                logger.info(f'Dashboard {waldur_org.name} has been created.')
+            elif grafana_dashboard:
+                payload['dashboard']['uid'] = grafana_dashboard['uid']
+                payload['dashboard']['version'] = (
+                    grafana_dashboard.get('version', 0) + 1
+                )
+                payload['overwrite'] = True
                 dashboard = self.grafana_client.create_or_update_dashboard(payload)
-            else:
-                print(f'Multiple managed dashboards detected for org {waldur_org.name}')
+                logger.info(f'Dashboard {waldur_org.name} has been updated.')
 
     @cached_property
     def dashboard_template(self):
