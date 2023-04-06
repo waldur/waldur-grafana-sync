@@ -33,37 +33,30 @@ class Backend:
     def update_folder(self, uid, title):
         return self.manager.folder.update_folder(uid, title, overwrite=True)
 
-    def add_folder_team_permission(self, uid, team_name):
+    def set_folder_permissions(self, uid, team_name):
         existing_permissions = self.manager.folder.get_folder_permissions(uid)
         team = self.list_teams(team_name)
-        new_permissions = [{
-            'teamId': team[0]['id'],
-            'permission': 1
-        }]
+        new_permissions = [{'teamId': team[0]['id'], 'permission': 1}]
         for p in existing_permissions:
             if 'role' in p:
+                # Remove default global read from created grafana folders on sync
+                # See also: https://github.com/grafana/grafana/issues/19172
+                if p['role'] in {'Viewer', 'Editor'}:
+                    continue
                 new_permissions.append(
-                    {
-                        "role": p['role'],
-                        "permission": p['permission']
-                    })
+                    {'role': p['role'], 'permission': p['permission']}
+                )
             elif p['userId']:
                 new_permissions.append(
-                    {
-                        "userId": p['userId'],
-                        "permission": p['permission']
-                    },
+                    {'userId': p['userId'], 'permission': p['permission']},
                 )
             elif p['teamId']:
                 new_permissions.append(
-                    {
-                        "teamId": p['teamId'],
-                        "permission": p['permission']
-                    },
+                    {'teamId': p['teamId'], 'permission': p['permission']},
                 )
             else:
                 print('Failed to detect permission', p)
-        self.manager.folder.update_folder_permissions(uid, {"items": new_permissions})
+        self.manager.folder.update_folder_permissions(uid, {'items': new_permissions})
 
     def create_team(self, name):
         return self.manager.teams.add_team({'name': name})
@@ -120,13 +113,19 @@ class Backend:
 
     def create_user(self, name, login, email):
         payload = {
-            "name": name,
-            "email": email,
-            "login": login,
-            "password": self._generate_password(),
+            'name': name,
+            'email': email,
+            'login': login,
+            'password': self._generate_password(),
         }
         return self.manager.admin.create_user(payload)
 
     def _generate_password(self):
         alphabet = string.ascii_letters + string.digits
         return ''.join(secrets.choice(alphabet) for i in range(20))
+
+    def search_dashboards(self, **kwargs):
+        return self.manager.search.search_dashboards(**kwargs)
+
+    def create_or_update_dashboard(self, dashboard):
+        return self.manager.dashboard.update_dashboard(dashboard)
