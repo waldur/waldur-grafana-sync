@@ -30,7 +30,7 @@ PROTECTED_USERNAMES = os.environ.get(
 PROTECTED_TEAMS = os.environ.get('PROTECTED_TEAMS', 'Development,Management').split(',')
 
 ALL_SPECIAL_TEAMS = [STAFF_TEAM_NAME, SUPPORT_TEAM_NAME] + PROTECTED_TEAMS
-DRY_RUN = False
+DRY_RUN = os.environ.get('DRY_RUN', 'True') in ('TRUE', 'True', 'true', 'yes')
 
 
 @dataclass
@@ -189,10 +189,12 @@ class Sync:
                     continue
                 # create a new one
                 logger.info(f'Adding folder {expected_title} with UID {org_uuid}.')
-                self.grafana_client.create_folder(expected_title, org_uuid)
+                if not DRY_RUN:
+                    self.grafana_client.create_folder(expected_title, org_uuid)
                 folder_names.add(expected_title)
             # make sure that corresponding tean has read access to a folder
-            self.grafana_client.set_folder_permissions(org_uuid, expected_title)
+            if not DRY_RUN:
+                self.grafana_client.set_folder_permissions(org_uuid, expected_title)
 
         # cleanup existing folders with UUID like unique keys
         for folder_uid in grafana_folders.keys():
@@ -200,8 +202,8 @@ class Sync:
                 logger.info(
                     f'Removing folder {grafana_folders[folder_uid]} with UID {folder_uid}.'
                 )
-                # TODO: uncomment
-                # self.grafana_client.delete_folder(folder_uid)
+                if not DRY_RUN:
+                    self.grafana_client.delete_folder(folder_uid)
 
     def member_of(self, user_id, teams_list):
         user_teams = {t['name'] for t in self.grafana_client.list_user_teams(user_id)}
@@ -216,11 +218,8 @@ class Sync:
                 and grafana_user['login'] not in PROTECTED_USERNAMES
                 and not self.member_of(grafana_user['id'], ALL_SPECIAL_TEAMS)
             ):
-                if not DRY_RUN:
-                    logger.info('User deletion is TEMPORARY disabled.')
-                    # self.grafana_client.delete_user(grafana_user['id'])
                 logger.info(
-                    f'User {grafana_user["login"]} / {grafana_user["email"]} has been deleted.'
+                    f'User {grafana_user["login"]} / {grafana_user["email"]} does not have any managed roles.'
                 )
 
         for waldur_user in self.waldur_users:
@@ -241,6 +240,11 @@ class Sync:
         if not self.grafana_client.list_teams(team_name):
             if not DRY_RUN:
                 team_id = self.grafana_client.create_team(team_name)['teamId']
+            else:
+                logger.info(
+                    f'Team {team_name} creation not possible in dry run mode, skipping.'
+                )
+                return
             logger.info(f'Team {team_name} has been created.')
         else:
             team_id = self.grafana_client.list_teams(team_name)[0]['id']
@@ -300,9 +304,8 @@ class Sync:
             if team_name not in seen_org_names and team_name not in ALL_SPECIAL_TEAMS:
                 if not DRY_RUN:
                     pass
-                    # TODO: uncomment
                     # self.grafana_client.delete_teams(team_name)
-                logger.info(f'Team {team_name} has been deleted.')
+                logger.info(f'TEMPORARILY DISABLED. Team {team_name} has been deleted.')
 
     def sync_dashboards(self):
         self.waldur_organizations.keys()
@@ -328,7 +331,8 @@ class Sync:
                 'folderUid': waldur_org.uuid,
             }
             if not grafana_dashboard:
-                dashboard = self.grafana_client.create_or_update_dashboard(payload)
+                if not DRY_RUN:
+                    dashboard = self.grafana_client.create_or_update_dashboard(payload)
                 logger.info(f'Dashboard {waldur_org.name} has been created.')
             elif grafana_dashboard:
                 payload['dashboard']['uid'] = grafana_dashboard['uid']
@@ -336,7 +340,8 @@ class Sync:
                     grafana_dashboard.get('version', 0) + 1
                 )
                 payload['overwrite'] = True
-                dashboard = self.grafana_client.create_or_update_dashboard(payload)
+                if not DRY_RUN:
+                    dashboard = self.grafana_client.create_or_update_dashboard(payload)
                 logger.info(f'Dashboard {waldur_org.name} has been updated.')
 
     @cached_property
