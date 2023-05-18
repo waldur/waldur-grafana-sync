@@ -249,27 +249,32 @@ class Sync:
         else:
             team_id = self.grafana_client.list_teams(team_name)[0]['id']
 
-        members = self.grafana_client.get_team_members(team_id)
-        all_waldur_usernames = [s.username for s in self.waldur_users]
-        waldur_users = [u for u in waldur_users if u.username in all_waldur_usernames]
-        waldur_username = [s.username for s in waldur_users]
-        for member in members:
-            if member['login'] not in waldur_username:
-                if not DRY_RUN:
-                    self.grafana_client.remove_team_member(team_id, member['userId'])
-                logger.info(
-                    f'User {member["login"]} / {member["email"]} has been deleted from members of {team_name} / {team_id}.'
-                )
+        grafana_users = self.grafana_client.get_team_members(team_id)
 
-        for s in waldur_users:
-            if s.username not in [member['login'] for member in members]:
-                if not DRY_RUN:
-                    self.grafana_client.create_team_member(
-                        team_id, s.name, s.username, s.email
-                    )
-                logger.info(
-                    f'User {s.username} / {s.email} has been added to members of {team_name} / {team_id}.'
+        waldur_map = {user.username: user for user in waldur_users}
+        grafana_map = {user['login']: user for user in grafana_users}
+
+        new_usernames = set(waldur_map) - set(grafana_map)
+        stale_usernames = set(grafana_map) - set(waldur_map)
+
+        new_users = {waldur_map[username] for username in new_usernames}
+        stale_users = {grafana_map[username] for username in stale_usernames}
+
+        for user in stale_users:
+            if not DRY_RUN:
+                self.grafana_client.remove_team_member(team_id, user['userId'])
+            logger.info(
+                f'User {user["login"]} / {user["email"]} has been deleted from members of {team_name} / {team_id}.'
+            )
+
+        for user in new_users:
+            if not DRY_RUN:
+                self.grafana_client.create_team_member(
+                    team_id, user.name, user.username, user.email
                 )
+            logger.info(
+                f'User {user.username} / {user.email} has been added to members of {team_name} / {team_id}.'
+            )
 
     def sync_staff_team(self):
         self._sync_teams(
