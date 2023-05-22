@@ -257,8 +257,8 @@ class Sync:
         new_usernames = set(waldur_map) - set(grafana_map)
         stale_usernames = set(grafana_map) - set(waldur_map)
 
-        new_users = {waldur_map[username] for username in new_usernames}
-        stale_users = {grafana_map[username] for username in stale_usernames}
+        new_users = [waldur_map[username] for username in new_usernames]
+        stale_users = [grafana_map[username] for username in stale_usernames]
 
         for user in stale_users:
             if not DRY_RUN:
