@@ -251,8 +251,8 @@ class Sync:
 
         grafana_users = self.grafana_client.get_team_members(team_id)
 
-        waldur_map = {user.username: user for user in waldur_users}
-        grafana_map = {user['login']: user for user in grafana_users}
+        waldur_map = {user.email: user for user in waldur_users}
+        grafana_map = {user['email']: user for user in grafana_users}
 
         new_usernames = set(waldur_map) - set(grafana_map)
         stale_usernames = set(grafana_map) - set(waldur_map)
