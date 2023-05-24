@@ -35,7 +35,7 @@ class Backend:
 
     def set_folder_permissions(self, uid, team_name):
         existing_permissions = self.manager.folder.get_folder_permissions(uid)
-        team = self.list_teams(team_name)
+        team = self.get_team_by_name(team_name)
         new_permissions = [{'teamId': team[0]['id'], 'permission': 1}]
         for p in existing_permissions:
             if 'role' in p:
