@@ -61,8 +61,11 @@ class Backend:
     def create_team(self, name):
         return self.manager.teams.add_team({'name': name})
 
-    def list_teams(self, name=None):
-        return self.manager.teams.search_teams(name)
+    def list_teams(self):
+        return self.manager.teams.search_teams()
+
+    def get_team_by_name(self, name):
+        return self.manager.teams.get_team_by_name(name)
 
     def delete_teams(self, id_or_name):
         try:

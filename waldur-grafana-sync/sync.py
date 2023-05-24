@@ -237,7 +237,7 @@ class Sync:
                 )
 
     def _sync_teams(self, team_name, waldur_users: list[User]):
-        if not self.grafana_client.list_teams(team_name):
+        if not self.grafana_client.get_team_by_name(team_name):
             if not DRY_RUN:
                 team_id = self.grafana_client.create_team(team_name)['teamId']
             else:
@@ -247,7 +247,7 @@ class Sync:
                 return
             logger.info(f'Team {team_name} has been created.')
         else:
-            team_id = self.grafana_client.list_teams(team_name)[0]['id']
+            team_id = self.grafana_client.get_team_by_name(team_name)[0]['id']
 
         grafana_users = self.grafana_client.get_team_members(team_id)
 
