@@ -130,5 +130,8 @@ class Backend:
     def search_dashboards(self, **kwargs):
         return self.manager.search.search_dashboards(**kwargs)
 
+    def get_dashboard(self, uid):
+        return self.manager.dashboard.get_dashboard(uid)
+
     def create_or_update_dashboard(self, dashboard):
         return self.manager.dashboard.update_dashboard(dashboard)

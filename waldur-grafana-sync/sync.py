@@ -326,27 +326,38 @@ class Sync:
             if waldur_org.uuid not in folder_uids:
                 continue
             grafana_dashboard = grafana_dashboards_map.get(waldur_org.uuid)
-            dashboard = json.loads(
+            dashboard_uid = grafana_dashboard['uid']
+            dashboard_version = grafana_dashboard.get('version', 0)
+            dashboard_definition = self.grafana_client.get_dashboard(dashboard_uid)[
+                'dashboard'
+            ]
+            new_dashboard = json.loads(
                 self.dashboard_template.replace(
                     '$CUSTOMER_NAME$', waldur_org.name
                 ).replace('$DATASOURCE_UID$', DATASOURCE_UID)
             )
             payload = {
-                'dashboard': dashboard,
+                'dashboard': new_dashboard,
                 'folderUid': waldur_org.uuid,
             }
             if not grafana_dashboard:
                 if not DRY_RUN:
-                    dashboard = self.grafana_client.create_or_update_dashboard(payload)
+                    self.grafana_client.create_or_update_dashboard(payload)
                 logger.info(f'Dashboard {waldur_org.name} has been created.')
             elif grafana_dashboard:
-                payload['dashboard']['uid'] = grafana_dashboard['uid']
-                payload['dashboard']['version'] = (
-                    grafana_dashboard.get('version', 0) + 1
-                )
+                del dashboard_definition['version']
+                del dashboard_definition['id']
+                del dashboard_definition['uid']
+
+                if dashboard_definition == new_dashboard:
+                    logger.info(f'Dashboard {waldur_org.name} is skipped.')
+                    continue
+
+                payload['dashboard']['uid'] = dashboard_uid
+                payload['dashboard']['version'] = dashboard_version + 1
                 payload['overwrite'] = True
                 if not DRY_RUN:
-                    dashboard = self.grafana_client.create_or_update_dashboard(payload)
+                    self.grafana_client.create_or_update_dashboard(payload)
                 logger.info(f'Dashboard {waldur_org.name} has been updated.')
 
     @cached_property
