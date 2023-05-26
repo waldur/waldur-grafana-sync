@@ -348,6 +348,7 @@ class Sync:
                 del dashboard_definition['version']
                 del dashboard_definition['id']
                 del dashboard_definition['uid']
+                del new_dashboard['id']
 
                 if dashboard_definition == new_dashboard:
                     logger.info(f'Dashboard {waldur_org.name} is skipped.')
