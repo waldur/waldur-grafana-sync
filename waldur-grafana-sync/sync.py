@@ -23,6 +23,7 @@ REGISTRATION_METHOD = os.environ.get('REGISTRATION_METHOD', 'eduteams')
 STAFF_TEAM_NAME = os.environ.get('STAFF_TEAM_NAME', 'staff')
 SUPPORT_TEAM_NAME = os.environ.get('SUPPORT_TEAM_NAME', 'support')
 DATASOURCE_UID = os.environ['DATASOURCE_UID']
+PROMETHEUS_UID = os.environ['PROMETHEUS_UID']
 
 PROTECTED_USERNAMES = os.environ.get(
     'PROTECTED_USERNAMES', 'admin,' + BACKEND_API_USER
@@ -332,9 +333,9 @@ class Sync:
                 'dashboard'
             ]
             new_dashboard = json.loads(
-                self.dashboard_template.replace(
-                    '$CUSTOMER_NAME$', waldur_org.name
-                ).replace('$DATASOURCE_UID$', DATASOURCE_UID)
+                self.dashboard_template.replace('$CUSTOMER_NAME$', waldur_org.name)
+                .replace('$DATASOURCE_UID$', DATASOURCE_UID)
+                .replace('$PROMETHEUS_UID$', PROMETHEUS_UID)
             )
             payload = {
                 'dashboard': new_dashboard,
