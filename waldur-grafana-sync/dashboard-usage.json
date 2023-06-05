@@ -193,7 +193,7 @@
             "uid": "$PROMETHEUS_UID$"
           },
           "editorMode": "builder",
-          "expr": "aggregated_usages{project_uuid=\"${project:uuid}\", component_type=\"cpu_k_hours\"}",
+          "expr": "component_usages_per_project{project_uuid=\"${project:uuid}\", component_type=\"cpu_k_hours\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -285,7 +285,7 @@
             "uid": "$PROMETHEUS_UID$"
           },
           "editorMode": "builder",
-          "expr": "aggregated_usages{project_uuid=\"${project:uuid}\", component_type=\"gpu_hours\"}",
+          "expr": "component_usages_per_project{project_uuid=\"${project:uuid}\", component_type=\"gpu_hours\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -377,7 +377,7 @@
             "uid": "$PROMETHEUS_UID$"
           },
           "editorMode": "builder",
-          "expr": "aggregated_usages{project_uuid=\"${project:uuid}\", component_type=\"gb_k_hours\"}",
+          "expr": "component_usages_per_project{project_uuid=\"${project:uuid}\", component_type=\"gb_k_hours\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
