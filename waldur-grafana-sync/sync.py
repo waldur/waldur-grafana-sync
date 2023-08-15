@@ -327,11 +327,6 @@ class Sync:
             if waldur_org.uuid not in folder_uids:
                 continue
             grafana_dashboard = grafana_dashboards_map.get(waldur_org.uuid)
-            dashboard_uid = grafana_dashboard['uid']
-            dashboard_version = grafana_dashboard.get('version', 0)
-            dashboard_definition = self.grafana_client.get_dashboard(dashboard_uid)[
-                'dashboard'
-            ]
             new_dashboard = json.loads(
                 self.dashboard_template.replace('$CUSTOMER_NAME$', waldur_org.name)
                 .replace('$DATASOURCE_UID$', DATASOURCE_UID)
@@ -346,6 +341,12 @@ class Sync:
                     self.grafana_client.create_or_update_dashboard(payload)
                 logger.info(f'Dashboard {waldur_org.name} has been created.')
             elif grafana_dashboard:
+                dashboard_uid = grafana_dashboard['uid']
+                dashboard_version = grafana_dashboard.get('version', 0)
+                dashboard_definition = self.grafana_client.get_dashboard(dashboard_uid)[
+                    'dashboard'
+                ]
+
                 del dashboard_definition['version']
                 del dashboard_definition['id']
                 del dashboard_definition['uid']
