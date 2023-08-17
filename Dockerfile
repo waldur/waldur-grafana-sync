@@ -1,6 +1,6 @@
 # Use to avoid pull rate limit for Docker Hub images
 ARG DOCKER_REGISTRY=docker.io/
-FROM ${DOCKER_REGISTRY}library/python:3.9
+FROM ${DOCKER_REGISTRY}library/python:3.11
 
 COPY . /usr/src/waldur-grafana-sync
 

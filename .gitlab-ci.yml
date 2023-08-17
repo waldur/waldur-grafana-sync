@@ -5,7 +5,7 @@ include:
     file: "/templates/release/publish.yml"
 
 Run linters:
-  image: registry.hpc.ut.ee/mirror/library/python:3.8-bullseye
+  image: registry.hpc.ut.ee/mirror/library/python:3.11-bullseye
   stage: test
   interruptible: true
   rules:
