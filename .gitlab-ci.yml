@@ -5,7 +5,7 @@ include:
     file: "/templates/release/publish.yml"
 
 Run linters:
-  image: "$CI_REGISTRY/waldur/waldur-pipelines/python:3.8"
+  image: registry.hpc.ut.ee/mirror/library/python:3.8-bullseye
   stage: test
   interruptible: true
   rules:
