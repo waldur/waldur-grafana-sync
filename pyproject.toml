@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "waldur-grafana-sync"
+version = "0.1.0"
+description = ""
+authors = ["OpenNode Team <info@opennodecloud.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+python-waldur-client = "0.2.5"
+grafana-api = "1.0.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+# Never enforce `E501` (line length violations).
+ignore = ["E501"]
+
+select = [
+  "E",   # pycodestyle
+  "F",   # pyflakes
+  "UP",  # pyupgrade
+]
+
+target-version = "py38"

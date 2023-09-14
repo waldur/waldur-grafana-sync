@@ -19,3 +19,10 @@ repos:
         files: ^waldur-grafana-sync/
         additional_dependencies:
           - tomli
+
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.0.289
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^waldur-grafana-sync/
