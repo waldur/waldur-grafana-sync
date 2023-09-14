@@ -6,9 +6,9 @@ from urllib.parse import urlparse
 from grafana_api.grafana_api import GrafanaClientError
 from grafana_api.grafana_face import GrafanaFace
 
-BACKEND_API_URL = os.environ['BACKEND_API_URL']
-BACKEND_API_USER = os.environ['BACKEND_API_USER']
-BACKEND_API_PASSWORD = os.environ['BACKEND_API_PASSWORD']
+BACKEND_API_URL = os.environ["BACKEND_API_URL"]
+BACKEND_API_USER = os.environ["BACKEND_API_USER"]
+BACKEND_API_PASSWORD = os.environ["BACKEND_API_PASSWORD"]
 
 
 class Backend:
@@ -36,30 +36,30 @@ class Backend:
     def set_folder_permissions(self, uid, team_name):
         existing_permissions = self.manager.folder.get_folder_permissions(uid)
         team = self.get_team_by_name(team_name)
-        new_permissions = [{'teamId': team[0]['id'], 'permission': 1}]
+        new_permissions = [{"teamId": team[0]["id"], "permission": 1}]
         for p in existing_permissions:
-            if 'role' in p:
+            if "role" in p:
                 # Remove default global read from created grafana folders on sync
                 # See also: https://github.com/grafana/grafana/issues/19172
-                if p['role'] in {'Viewer', 'Editor'}:
+                if p["role"] in {"Viewer", "Editor"}:
                     continue
                 new_permissions.append(
-                    {'role': p['role'], 'permission': p['permission']}
+                    {"role": p["role"], "permission": p["permission"]}
                 )
-            elif p['userId']:
+            elif p["userId"]:
                 new_permissions.append(
-                    {'userId': p['userId'], 'permission': p['permission']},
+                    {"userId": p["userId"], "permission": p["permission"]},
                 )
-            elif p['teamId']:
+            elif p["teamId"]:
                 new_permissions.append(
-                    {'teamId': p['teamId'], 'permission': p['permission']},
+                    {"teamId": p["teamId"], "permission": p["permission"]},
                 )
             else:
-                print('Failed to detect permission', p)
-        self.manager.folder.update_folder_permissions(uid, {'items': new_permissions})
+                print("Failed to detect permission", p)
+        self.manager.folder.update_folder_permissions(uid, {"items": new_permissions})
 
     def create_team(self, name):
-        return self.manager.teams.add_team({'name': name})
+        return self.manager.teams.add_team({"name": name})
 
     def list_teams(self):
         return self.manager.teams.search_teams()
@@ -76,7 +76,7 @@ class Backend:
             if not team or len(team) > 1:
                 return
 
-            team_id = team[0]['id']
+            team_id = team[0]["id"]
         return self.manager.teams.delete_team(team_id)
 
     def get_team_members(self, team_id):
@@ -90,17 +90,17 @@ class Backend:
             user_id = int(user_id_or_email)
         except ValueError:
             user = self.manager.users.find_user(user_id_or_email)
-            user_id = user['id']
+            user_id = user["id"]
 
         return self.manager.teams.add_team_member(team_id, user_id)
 
     def create_team_member(self, team_id, name, login, email):
         try:
             user = self.manager.users.find_user(email)
-            user_id = user['id']
+            user_id = user["id"]
         except GrafanaClientError:
             response = self.create_user(name, login, email)
-            user_id = response['id']
+            user_id = response["id"]
 
         return self.manager.teams.add_team_member(team_id, user_id)
 
@@ -109,23 +109,23 @@ class Backend:
 
     def list_user_teams(self, user_id):
         # XXX: Dirty hack, but SDK doesn't have a method for user teams
-        return self.manager.users.get_user(f'{user_id}/teams')
+        return self.manager.users.get_user(f"{user_id}/teams")
 
     def delete_user(self, user_id):
         return self.manager.admin.delete_user(user_id)
 
     def create_user(self, name, login, email):
         payload = {
-            'name': name,
-            'email': email,
-            'login': login,
-            'password': self._generate_password(),
+            "name": name,
+            "email": email,
+            "login": login,
+            "password": self._generate_password(),
         }
         return self.manager.admin.create_user(payload)
 
     def _generate_password(self):
         alphabet = string.ascii_letters + string.digits
-        return ''.join(secrets.choice(alphabet) for i in range(20))
+        return "".join(secrets.choice(alphabet) for i in range(20))
 
     def search_dashboards(self, **kwargs):
         return self.manager.search.search_dashboards(**kwargs)
