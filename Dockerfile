@@ -8,7 +8,7 @@ COPY . /usr/src/waldur-grafana-sync
 
 WORKDIR /usr/src/waldur-grafana-sync
 RUN /bin/true\
-    && /usr/bin/poetry config virtualenvs.create false \
+    && poetry config virtualenvs.create false \
     && poetry install --no-interaction \
     && rm -rf /root/.cache/pypoetry
 
