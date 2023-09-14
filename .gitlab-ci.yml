@@ -1,8 +1,32 @@
 include:
   - project: "waldur/waldur-pipelines"
     file: "/templates/stages.yml"
-  - project: "waldur/waldur-pipelines"
-    file: "/templates/release/publish.yml"
+
+build:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - AUTH=$(echo -n "${WALDUR_DOCKER_HUB_USER}:${WALDUR_DOCKER_HUB_PASSWORD}" | base64)
+    - |
+      cat << EOF > /kaniko/.docker/config.json
+      {
+        "auths": {
+          "https://index.docker.io/v1/": {
+            "auth": "${AUTH}"
+          }
+        }
+      }
+      EOF
+    - /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/Dockerfile"
+      --build-arg DOCKER_REGISTRY=$DOCKER_REGISTRY
+      --destination "opennode/$CI_PROJECT_NAME:latest"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
 
 Run linters:
   image: registry.hpc.ut.ee/mirror/library/python:3.11
