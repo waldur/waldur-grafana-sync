@@ -27,7 +27,6 @@ build:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
 
-
 Run linters:
   image: registry.hpc.ut.ee/mirror/library/python:3.11
   interruptible: true
