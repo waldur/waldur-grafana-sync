@@ -1,5 +1,4 @@
 import logging
-from time import sleep
 
 from sync import Sync
 
@@ -13,14 +12,10 @@ logger = logging.getLogger(__name__)
 
 
 if __name__ == "__main__":
-    while True:
-        try:
-            sync = Sync()
-            logger.info("Start of Grafana sync.")
-            sync.run()
-            logger.info("End of Grafana sync.")
-
-        except Exception as e:
-            logger.exception(f"Grafana synchronization error. Message: {e}.")
-
-        sleep(float(60 * 5))
+    try:
+        sync = Sync()
+        logger.info("Start of Grafana sync.")
+        sync.run()
+        logger.info("End of Grafana sync.")
+    except Exception as e:
+        logger.exception(f"Grafana synchronization error. Message: {e}.")

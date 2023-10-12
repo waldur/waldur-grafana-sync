@@ -23,6 +23,7 @@ REGISTRATION_METHOD = os.environ.get("REGISTRATION_METHOD", "eduteams")
 STAFF_TEAM_NAME = os.environ.get("STAFF_TEAM_NAME", "staff")
 SUPPORT_TEAM_NAME = os.environ.get("SUPPORT_TEAM_NAME", "support")
 DATASOURCE_UID = os.environ["DATASOURCE_UID"]
+DATASOURCE_METRICS_UID = os.environ["DATASOURCE_METRICS_UID"]
 PROMETHEUS_UID = os.environ["PROMETHEUS_UID"]
 
 PROTECTED_USERNAMES = os.environ.get(
@@ -54,6 +55,14 @@ class Organisation:
     country: str = ""
     is_service_provider: bool = False
     owners: list[User] = field(default_factory=list)
+
+
+@dataclass
+class Project:
+    uuid: str
+    name: str
+    customer_uuid: str
+    resources_count: int
 
 
 def is_uuid_like(val):
@@ -165,6 +174,22 @@ class Sync:
                     is_support=item["is_support"],
                 )
             )
+        return result
+
+    @cached_property
+    def waldur_projects(self):
+        result = []
+
+        for project in self.waldur_client.list_projects():
+            result.append(
+                Project(
+                    uuid=project["uuid"],
+                    name=project["name"],
+                    customer_uuid=project["customer_uuid"],
+                    resources_count=project["resources_count"],
+                )
+            )
+
         return result
 
     def sync_folders(self):
@@ -318,6 +343,33 @@ class Sync:
                     # self.grafana_client.delete_teams(team_name)
                 logger.info(f"TEMPORARILY DISABLED. Team {team_name} has been deleted.")
 
+    def _update_dashboards(
+        self, grafana_dashboard, new_dashboard, payload, ignore_uid=False
+    ):
+        dashboard_uid = grafana_dashboard["uid"]
+        dashboard_version = grafana_dashboard.get("version", 0)
+        dashboard_definition = self.grafana_client.get_dashboard(dashboard_uid)[
+            "dashboard"
+        ]
+
+        del dashboard_definition["version"]
+        del dashboard_definition["id"]
+        del dashboard_definition["uid"]
+        del new_dashboard["id"]
+
+        if "uid" in new_dashboard and not ignore_uid:
+            del new_dashboard["uid"]
+
+        if dashboard_definition == new_dashboard:
+            return
+        else:
+            payload["dashboard"]["uid"] = dashboard_uid
+            payload["dashboard"]["version"] = dashboard_version + 1
+            payload["overwrite"] = True
+            if not DRY_RUN:
+                self.grafana_client.create_or_update_dashboard(payload)
+            return True
+
     def sync_dashboards(self):
         self.waldur_organizations.keys()
         grafana_dashboards_list = self.grafana_client.search_dashboards(tag="managed")
@@ -333,7 +385,8 @@ class Sync:
                 continue
             grafana_dashboard = grafana_dashboards_map.get(waldur_org.uuid)
             new_dashboard = json.loads(
-                self.dashboard_template.replace("$CUSTOMER_NAME$", waldur_org.name)
+                self.dashboard_template("dashboard-organisation-summary")
+                .replace("$CUSTOMER_NAME$", waldur_org.name)
                 .replace("$DATASOURCE_UID$", DATASOURCE_UID)
                 .replace("$PROMETHEUS_UID$", PROMETHEUS_UID)
             )
@@ -346,29 +399,60 @@ class Sync:
                     self.grafana_client.create_or_update_dashboard(payload)
                 logger.info(f"Dashboard {waldur_org.name} has been created.")
             elif grafana_dashboard:
-                dashboard_uid = grafana_dashboard["uid"]
-                dashboard_version = grafana_dashboard.get("version", 0)
-                dashboard_definition = self.grafana_client.get_dashboard(dashboard_uid)[
-                    "dashboard"
-                ]
-
-                del dashboard_definition["version"]
-                del dashboard_definition["id"]
-                del dashboard_definition["uid"]
-                del new_dashboard["id"]
-
-                if dashboard_definition == new_dashboard:
+                if self._update_dashboards(
+                    grafana_dashboard, new_dashboard, payload, True
+                ):
+                    logger.info(f"Dashboard {waldur_org.name} has been updated.")
+                else:
                     logger.info(f"Dashboard {waldur_org.name} is skipped.")
-                    continue
 
-                payload["dashboard"]["uid"] = dashboard_uid
-                payload["dashboard"]["version"] = dashboard_version + 1
-                payload["overwrite"] = True
+            # proceed with syncing of the project dashboards
+            self.sync_project_dashboards(waldur_org)
+
+    def sync_project_dashboards(self, waldur_org):
+        grafana_project_dashboards_list = self.grafana_client.search_dashboards(
+            tag="project"
+        )
+        grafana_project_dashboards_map = {
+            dashboard["uid"]: dashboard
+            for dashboard in grafana_project_dashboards_list
+            if "uid" in dashboard
+        }
+
+        for project in self.waldur_projects:
+            if project.customer_uuid != waldur_org.uuid:
+                continue
+
+            if not project.resources_count:
+                continue
+
+            grafana_project_dashboard = grafana_project_dashboards_map.get(project.uuid)
+            new_dashboard = json.loads(
+                self.dashboard_template("dashboard-project")
+                .replace("$PROJECT_NAME$", project.name)
+                .replace("$DATASOURCE_METRICS_UID$", DATASOURCE_METRICS_UID)
+                .replace("$PROJECT_UUID$", project.uuid)
+            )
+            payload = {
+                "dashboard": new_dashboard,
+                "folderUid": waldur_org.uuid,
+            }
+
+            if not grafana_project_dashboard:
                 if not DRY_RUN:
                     self.grafana_client.create_or_update_dashboard(payload)
-                logger.info(f"Dashboard {waldur_org.name} has been updated.")
 
-    @cached_property
-    def dashboard_template(self):
-        path = os.path.join(os.path.dirname(__file__), "dashboard-usage.json")
+                logger.info(f"Project dashboard {project.name} has been created.")
+
+            elif grafana_project_dashboard:
+                if self._update_dashboards(
+                    grafana_project_dashboard, new_dashboard, payload
+                ):
+                    logger.info(f"Project dashboard {project.name} has been updated.")
+                else:
+                    logger.info(f"Project dashboard {project.name} is skipped.")
+
+    @staticmethod
+    def dashboard_template(template_name):
+        path = os.path.join(os.path.dirname(__file__), template_name + ".json")
         return open(path).read()
