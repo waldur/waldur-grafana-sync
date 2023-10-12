@@ -1,0 +1,193 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "$DATASOURCE_METRICS_UID$"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 15,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "$DATASOURCE_METRICS_UID$"
+          },
+          "format": "time_series",
+          "group": [],
+          "metricColumn": "limit_name",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  date AS \"time\",\n  limit_value AS \"limit\"\nFROM resource_limits\nWHERE\n  resource_name = '$resource_name' \n  AND project_uuid = '$PROJECT_UUID$' \n  AND limit_name = '$type'\nORDER BY 1,2",
+          "refId": "A",
+          "select": [],
+          "table": "resource_limits",
+          "timeColumn": "date",
+          "timeColumnType": "date",
+          "where": []
+        },
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "$DATASOURCE_METRICS_UID$"
+          },
+          "format": "time_series",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  date AS \"time\",\n  usage_since_creation AS \"usage\"\nFROM resource_usages\nWHERE\n  resource_name = '$resource_name' \n  AND project_uuid = '$PROJECT_UUID$' \n  AND type = '$type'\nORDER BY 1,2",
+          "refId": "B",
+          "select": [],
+          "timeColumn": "date",
+          "timeColumnType": "date",
+          "where": []
+        }
+      ],
+      "title": "Limits and usages",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": false,
+  "schemaVersion": 37,
+  "style": "dark",
+  "tags": [
+    "project"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "$DATASOURCE_METRICS_UID$"
+        },
+        "definition": "SELECT resource_name FROM resource_limits WHERE project_uuid='$PROJECT_UUID$' GROUP BY resource_name\nUNION\nSELECT resource_name FROM resource_usages WHERE project_uuid='$PROJECT_UUID$' GROUP BY resource_name;",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Resource",
+        "multi": false,
+        "name": "resource_name",
+        "options": [],
+        "query": "SELECT resource_name FROM resource_limits WHERE project_uuid='$PROJECT_UUID$' GROUP BY resource_name\nUNION\nSELECT resource_name FROM resource_usages WHERE project_uuid='$PROJECT_UUID$' GROUP BY resource_name;",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "storage",
+          "value": "storage"
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "$DATASOURCE_METRICS_UID$"
+        },
+        "definition": "SELECT limit_name FROM resource_limits WHERE project_uuid='$PROJECT_UUID$' GROUP BY limit_name\nUNION\nSELECT type FROM resource_usages WHERE project_uuid='$PROJECT_UUID$' GROUP BY type;",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Type",
+        "multi": false,
+        "name": "type",
+        "options": [],
+        "query": "SELECT limit_name FROM resource_limits WHERE project_uuid='$PROJECT_UUID$' GROUP BY limit_name\nUNION\nSELECT type FROM resource_usages WHERE project_uuid='$PROJECT_UUID$' GROUP BY type;",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1y",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "$PROJECT_NAME$ ($PROJECT_UUID$)",
+  "uid": "$PROJECT_UUID$"
+}
