@@ -10,6 +10,21 @@
   "liveNow": false,
   "panels": [
     {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 3,
+      "panels": [],
+      "repeat": "resource_uuid",
+      "repeatDirection": "v",
+      "title": "$resource_uuid",
+      "type": "row"
+    },
+    {
       "datasource": {
         "type": "postgres",
         "uid": "$DATASOURCE_METRICS_UID$"
@@ -33,7 +48,7 @@
               "tooltip": false,
               "viz": false
             },
-            "lineInterpolation": "linear",
+            "lineInterpolation": "stepAfter",
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
@@ -85,6 +100,8 @@
           "sort": "none"
         }
       },
+      "repeat": "type",
+      "repeatDirection": "v",
       "targets": [
         {
           "datasource": {
@@ -95,7 +112,7 @@
           "group": [],
           "metricColumn": "limit_name",
           "rawQuery": true,
-          "rawSql": "SELECT\n  date AS \"time\",\n  limit_value AS \"limit\"\nFROM resource_limits\nWHERE\n  resource_uuid = '$resource_uuid' \n  AND limit_name = '$type'\nORDER BY 1,2",
+          "rawSql": "SELECT\n  date AS \"time\",\n  limit_value AS \"limit\"\nFROM resource_limits\nWHERE\n  resource_uuid IN ($resource_uuid) \n  AND limit_name IN ($type)\nORDER BY 1,2",
           "refId": "A",
           "select": [],
           "table": "resource_limits",
@@ -112,7 +129,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  date AS \"time\",\n  usage_since_creation AS \"usage\"\nFROM resource_usages\nWHERE\n  resource_uuid = '$resource_uuid' \n  AND type = '$type'\nORDER BY 1,2",
+          "rawSql": "SELECT\n  date AS \"time\",\n  usage_since_creation AS \"usage\"\nFROM resource_usages\nWHERE\n  resource_uuid IN ($resource_uuid) \n  AND type IN ($type)\nORDER BY 1,2",
           "refId": "B",
           "select": [],
           "timeColumn": "date",
@@ -120,7 +137,7 @@
           "where": []
         }
       ],
-      "title": "Limits and usages",
+      "title": "$type",
       "type": "timeseries"
     }
   ],
@@ -146,7 +163,7 @@
         "hide": 0,
         "includeAll": false,
         "label": "Resource",
-        "multi": false,
+        "multi": true,
         "name": "resource_uuid",
         "options": [],
         "query": "SELECT CONCAT(resource_name, '-', resource_uuid) FROM resource_limits WHERE project_uuid='$PROJECT_UUID$' GROUP BY resource_name, resource_uuid UNION SELECT CONCAT(resource_name, '-', resource_uuid) FROM resource_usages WHERE project_uuid='$PROJECT_UUID$' GROUP BY resource_name, resource_uuid;",
@@ -170,7 +187,7 @@
         "hide": 0,
         "includeAll": false,
         "label": "Type",
-        "multi": false,
+        "multi": true,
         "name": "type",
         "options": [],
         "query": "SELECT limit_name FROM resource_limits WHERE project_uuid='$PROJECT_UUID$' GROUP BY limit_name\nUNION\nSELECT type FROM resource_usages WHERE project_uuid='$PROJECT_UUID$' GROUP BY type;",
