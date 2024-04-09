@@ -33,7 +33,7 @@ PROTECTED_TEAMS = os.environ.get("PROTECTED_TEAMS", "Development,Management").sp
 PROTECTED_FOLDERS = os.environ.get("PROTECTED_FOLDERS", "Development").split(",")
 
 ALL_SPECIAL_TEAMS = [STAFF_TEAM_NAME, SUPPORT_TEAM_NAME] + PROTECTED_TEAMS
-DRY_RUN = os.environ.get("DRY_RUN", "True") in ("TRUE", "True", "true", "yes")
+DRY_RUN = True  # os.environ.get("DRY_RUN", "True") in ("TRUE", "True", "true", "yes")
 
 
 @dataclass
@@ -102,6 +102,15 @@ class Sync:
     def waldur_support_users(self):
         return [user for user in self.waldur_users if user.is_support]
 
+    def get_organization_users(self, customer_uuid):
+        org_users = self.waldur_client.get_customer_permissions(customer_uuid)
+        return [
+            User(
+                u["user_uuid"], u["user_username"], u["user_email"], u["user_full_name"]
+            )
+            for u in org_users
+        ]
+
     @cached_property
     def waldur_organizations(self):
         query = {
@@ -126,10 +135,7 @@ class Sync:
                 c["abbreviation"],
                 c["country"],
                 c["is_service_provider"],
-                [
-                    User(u["uuid"], u["username"], u["email"], u["full_name"])
-                    for u in c["owners"]
-                ],
+                self.get_organization_users(c["uuid"]),
             )
             for c in self.waldur_client.list_customers(query)
         }
