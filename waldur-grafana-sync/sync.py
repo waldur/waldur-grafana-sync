@@ -154,9 +154,9 @@ class Sync:
         for item in self.waldur_client.list_users(query):
             organizations = [
                 Organisation(
-                    p["customer_uuid"],
-                    p["customer_name"],
-                    p.get("customer_division_name", ""),
+                    p["scope_uuid"],
+                    p["scope_name"],
+                    p.get("organization_group_name", ""),
                 )
                 for p in item["permissions"]
                 if p["role_name"] == "CUSTOMER.OWNER"
