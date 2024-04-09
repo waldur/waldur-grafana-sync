@@ -141,7 +141,7 @@ class Sync:
             "registration_method": REGISTRATION_METHOD,
             "is_active": True,
             "field": [
-                "customer_permissions",
+                "permissions",
                 "is_staff",
                 "is_support",
                 "username",
@@ -158,8 +158,8 @@ class Sync:
                     p["customer_name"],
                     p.get("customer_division_name", ""),
                 )
-                for p in item["customer_permissions"]
-                if p["role"] == "owner"
+                for p in item["permissions"]
+                if p["role"] == "CUSTOMER.OWNER"
             ]
             if not item["is_staff"] and not item["is_support"] and not organizations:
                 continue
