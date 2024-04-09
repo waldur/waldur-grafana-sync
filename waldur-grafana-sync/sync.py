@@ -159,7 +159,7 @@ class Sync:
                     p.get("customer_division_name", ""),
                 )
                 for p in item["permissions"]
-                if p["role"] == "CUSTOMER.OWNER"
+                if p["role_name"] == "CUSTOMER.OWNER"
             ]
             if not item["is_staff"] and not item["is_support"] and not organizations:
                 continue
