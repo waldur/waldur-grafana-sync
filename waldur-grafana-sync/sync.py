@@ -33,7 +33,7 @@ PROTECTED_TEAMS = os.environ.get("PROTECTED_TEAMS", "Development,Management").sp
 PROTECTED_FOLDERS = os.environ.get("PROTECTED_FOLDERS", "Development").split(",")
 
 ALL_SPECIAL_TEAMS = [STAFF_TEAM_NAME, SUPPORT_TEAM_NAME] + PROTECTED_TEAMS
-DRY_RUN = True  # os.environ.get("DRY_RUN", "True") in ("TRUE", "True", "true", "yes")
+DRY_RUN = os.environ.get("DRY_RUN", "True") in ("TRUE", "True", "true", "yes")
 
 
 @dataclass
