@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import uuid
+from time import sleep
 from dataclasses import dataclass, field
 from functools import cached_property
 
@@ -87,11 +88,17 @@ class Sync:
         return WaldurClient(WALDUR_API_URL, WALDUR_API_TOKEN)
 
     def run(self):
+        logger.info("Starting sync of users.")
         self.sync_users()
+        logger.info("Starting sync of organization teams.")
         self.sync_organization_teams()
+        logger.info("Starting sync of staff team.")
         self.sync_staff_team()
+        logger.info("Starting sync of support team.")
         self.sync_support_team()
+        logger.info("Starting sync of folders.")
         self.sync_folders()
+        logger.info("Starting sync of dashboards.")
         self.sync_dashboards()
 
     @property
@@ -417,7 +424,7 @@ class Sync:
 
     def sync_project_dashboards(self, waldur_org):
         grafana_project_dashboards_list = self.grafana_client.search_dashboards(
-            tag="project"
+            tag="project", limit=5000
         )
         grafana_project_dashboards_map = {
             dashboard["uid"]: dashboard
@@ -426,6 +433,7 @@ class Sync:
         }
 
         for project in self.waldur_projects:
+            sleep(0.1)
             if project.customer_uuid != waldur_org.uuid:
                 continue
 
@@ -447,7 +455,6 @@ class Sync:
             if not grafana_project_dashboard:
                 if not DRY_RUN:
                     self.grafana_client.create_or_update_dashboard(payload)
-
                 logger.info(f"Project dashboard {project.name} has been created.")
 
             elif grafana_project_dashboard:
