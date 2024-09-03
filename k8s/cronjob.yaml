@@ -1,8 +1,10 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: batch/v1
+kind: CronJob
 metadata:
   name: waldur-grafana-sync
 spec:
+  schedule: 10 * * * *
+  concurrencyPolicy: Allow
   selector:
     matchLabels:
       app: waldur-grafana-sync
