@@ -212,42 +212,54 @@ class Sync:
         }
         folder_names = set(grafana_folders.values())
         for org_uuid, waldur_org in self.waldur_organizations.items():
-            abbreviation = (
-                f" ({waldur_org.abbreviation})" if waldur_org.abbreviation else ""
-            )
-            expected_title = f"{waldur_org.name}{abbreviation}"
-            if org_uuid in grafana_folders:
-                # check if name needs updates
-                if grafana_folders[org_uuid] != expected_title:
-                    logger.info(
-                        f"Updating folder with UID {org_uuid}. {grafana_folders[org_uuid]} -> {expected_title}"
-                    )
-                    self.grafana_client.update_folder(org_uuid, expected_title)
-            else:
-                if expected_title in folder_names:
-                    print(f"Duplicate {expected_title} is detected")
-                    continue
-                # create a new one
-                logger.info(f"Adding folder {expected_title} with UID {org_uuid}.")
+            try:
+                abbreviation = (
+                    f" ({waldur_org.abbreviation})" if waldur_org.abbreviation else ""
+                )
+                expected_title = f"{waldur_org.name}{abbreviation}"
+                if org_uuid in grafana_folders:
+                    # check if name needs updates
+                    if grafana_folders[org_uuid] != expected_title:
+                        logger.info(
+                            f"Updating folder with UID {org_uuid}. {grafana_folders[org_uuid]} -> {expected_title}"
+                        )
+                        self.grafana_client.update_folder(org_uuid, expected_title)
+                else:
+                    if expected_title in folder_names:
+                        print(f"Duplicate {expected_title} is detected")
+                        continue
+                    # create a new one
+                    logger.info(f"Adding folder {expected_title} with UID {org_uuid}.")
+                    if not DRY_RUN:
+                        self.grafana_client.create_folder(expected_title, org_uuid)
+                    folder_names.add(expected_title)
+                # make sure that corresponding tean has read access to a folder
                 if not DRY_RUN:
-                    self.grafana_client.create_folder(expected_title, org_uuid)
-                folder_names.add(expected_title)
-            # make sure that corresponding tean has read access to a folder
-            if not DRY_RUN:
-                self.grafana_client.set_folder_permissions(org_uuid, expected_title)
+                    self.grafana_client.set_folder_permissions(org_uuid, expected_title)
+            except Exception as e:
+                logger.exception(
+                    "Grafana folder sync error (org UUID %s). Message: %s.", org_uuid, e
+                )
 
         # cleanup existing folders with UUID like unique keys
         for folder_uid in grafana_folders.keys():
-            if (
-                grafana_folders[folder_uid] not in PROTECTED_FOLDERS
-                and is_uuid_like(folder_uid)
-                and folder_uid not in self.waldur_organizations
-            ):
-                logger.info(
-                    f"Removing folder {grafana_folders[folder_uid]} with UID {folder_uid}."
+            try:
+                if (
+                    grafana_folders[folder_uid] not in PROTECTED_FOLDERS
+                    and is_uuid_like(folder_uid)
+                    and folder_uid not in self.waldur_organizations
+                ):
+                    logger.info(
+                        f"Removing folder {grafana_folders[folder_uid]} with UID {folder_uid}."
+                    )
+                    if not DRY_RUN:
+                        self.grafana_client.delete_folder(folder_uid)
+            except Exception as e:
+                logger.exception(
+                    "Grafana folder deletion error (folder UID %s). Message: %s.",
+                    folder_uid,
+                    e,
                 )
-                if not DRY_RUN:
-                    self.grafana_client.delete_folder(folder_uid)
 
     def member_of(self, user_id, teams_list):
         user_teams = {t["name"] for t in self.grafana_client.list_user_teams(user_id)}
@@ -267,17 +279,24 @@ class Sync:
                 )
 
         for waldur_user in self.waldur_users:
-            if waldur_user.username not in [
-                grafana_user["login"] for grafana_user in grafana_users
-            ]:
-                if not DRY_RUN:
-                    self.grafana_client.create_user(
-                        email=waldur_user.email,
-                        name=waldur_user.name,
-                        login=waldur_user.username,
+            try:
+                if waldur_user.username not in [
+                    grafana_user["login"] for grafana_user in grafana_users
+                ]:
+                    if not DRY_RUN:
+                        self.grafana_client.create_user(
+                            email=waldur_user.email,
+                            name=waldur_user.name,
+                            login=waldur_user.username,
+                        )
+                    logger.info(
+                        f"User {waldur_user.username} / {waldur_user.email} has been created."
                     )
-                logger.info(
-                    f"User {waldur_user.username} / {waldur_user.email} has been created."
+            except Exception as e:
+                logger.exception(
+                    "Grafana user %s synchronization error. Message: %s.",
+                    waldur_user.username,
+                    e,
                 )
 
     def _sync_teams(self, team_name, waldur_users: list[User]):
@@ -305,20 +324,32 @@ class Sync:
         stale_users = [grafana_map[username] for username in stale_usernames]
 
         for user in stale_users:
-            if not DRY_RUN:
-                self.grafana_client.remove_team_member(team_id, user["userId"])
-            logger.info(
-                f'User {user["login"]} / {user["email"]} has been deleted from members of {team_name} / {team_id}.'
-            )
+            try:
+                logger.info("Removing user %s from %s", user["email"], team_id)
+                if not DRY_RUN:
+                    self.grafana_client.remove_team_member(team_id, user["userId"])
+                logger.info(
+                    f'User {user["login"]} / {user["email"]} has been deleted from members of {team_name} / {team_id}.'
+                )
+            except Exception as e:
+                logger.exception(
+                    "Grafana user %s removal error. Message: %s.", user["email"], e
+                )
 
         for user in new_users:
-            if not DRY_RUN:
-                self.grafana_client.create_team_member(
-                    team_id, user.name, user.username, user.email
+            try:
+                logger.info("Adding user %s to %s", user.email, team_id)
+                if not DRY_RUN:
+                    self.grafana_client.create_team_member(
+                        team_id, user.name, user.username, user.email
+                    )
+                logger.info(
+                    f"User {user.username} / {user.email} has been added to members of {team_name} / {team_id}."
                 )
-            logger.info(
-                f"User {user.username} / {user.email} has been added to members of {team_name} / {team_id}."
-            )
+            except Exception as e:
+                logger.exception(
+                    "Grafana user %s adding error. Message: %s.", user.email, e
+                )
 
     def sync_staff_team(self):
         self._sync_teams(
@@ -350,11 +381,21 @@ class Sync:
 
         # cleanup existing folders with UUID like unique keys
         for team_name in grafana_teams:
-            if team_name not in seen_org_names and team_name not in ALL_SPECIAL_TEAMS:
-                if not DRY_RUN:
-                    pass
-                    # self.grafana_client.delete_teams(team_name)
-                logger.info(f"TEMPORARILY DISABLED. Team {team_name} has been deleted.")
+            try:
+                if (
+                    team_name not in seen_org_names
+                    and team_name not in ALL_SPECIAL_TEAMS
+                ):
+                    if not DRY_RUN:
+                        pass
+                        # self.grafana_client.delete_teams(team_name)
+                    logger.info(
+                        f"TEMPORARILY DISABLED. Team {team_name} has been deleted."
+                    )
+            except Exception as e:
+                logger.exception(
+                    "Grafana team %s synchronization error. Message: %s.", team_name, e
+                )
 
     def _update_dashboards(
         self, grafana_dashboard, new_dashboard, payload, ignore_uid=False
@@ -394,33 +435,40 @@ class Sync:
         folders = self.grafana_client.list_folders()
         folder_uids = {folder["uid"] for folder in folders}
         for waldur_org in self.waldur_organizations.values():
-            if waldur_org.uuid not in folder_uids:
-                continue
-            grafana_dashboard = grafana_dashboards_map.get(waldur_org.uuid)
-            new_dashboard = json.loads(
-                self.dashboard_template("dashboard-organisation-summary")
-                .replace("$CUSTOMER_NAME$", waldur_org.name)
-                .replace("$DATASOURCE_UID$", DATASOURCE_UID)
-                .replace("$PROMETHEUS_UID$", PROMETHEUS_UID)
-            )
-            payload = {
-                "dashboard": new_dashboard,
-                "folderUid": waldur_org.uuid,
-            }
-            if not grafana_dashboard:
-                if not DRY_RUN:
-                    self.grafana_client.create_or_update_dashboard(payload)
-                logger.info(f"Dashboard {waldur_org.name} has been created.")
-            elif grafana_dashboard:
-                if self._update_dashboards(
-                    grafana_dashboard, new_dashboard, payload, True
-                ):
-                    logger.info(f"Dashboard {waldur_org.name} has been updated.")
-                else:
-                    logger.info(f"Dashboard {waldur_org.name} is skipped.")
+            try:
+                if waldur_org.uuid not in folder_uids:
+                    continue
+                grafana_dashboard = grafana_dashboards_map.get(waldur_org.uuid)
+                new_dashboard = json.loads(
+                    self.dashboard_template("dashboard-organisation-summary")
+                    .replace("$CUSTOMER_NAME$", waldur_org.name)
+                    .replace("$DATASOURCE_UID$", DATASOURCE_UID)
+                    .replace("$PROMETHEUS_UID$", PROMETHEUS_UID)
+                )
+                payload = {
+                    "dashboard": new_dashboard,
+                    "folderUid": waldur_org.uuid,
+                }
+                if not grafana_dashboard:
+                    if not DRY_RUN:
+                        self.grafana_client.create_or_update_dashboard(payload)
+                    logger.info(f"Dashboard {waldur_org.name} has been created.")
+                elif grafana_dashboard:
+                    if self._update_dashboards(
+                        grafana_dashboard, new_dashboard, payload, True
+                    ):
+                        logger.info(f"Dashboard {waldur_org.name} has been updated.")
+                    else:
+                        logger.info(f"Dashboard {waldur_org.name} is skipped.")
 
-            # proceed with syncing of the project dashboards
-            self.sync_project_dashboards(waldur_org)
+                # proceed with syncing of the project dashboards
+                self.sync_project_dashboards(waldur_org)
+            except Exception as e:
+                logger.exception(
+                    "Grafana dashboard synchronization error (org name %s). Message: %s.",
+                    waldur_org.name,
+                    e,
+                )
 
     def sync_project_dashboards(self, waldur_org):
         grafana_project_dashboards_list = self.grafana_client.search_dashboards(
@@ -433,37 +481,49 @@ class Sync:
         }
 
         for project in self.waldur_projects:
-            sleep(0.1)
-            if project.customer_uuid != waldur_org.uuid:
-                continue
+            try:
+                sleep(0.1)
+                if project.customer_uuid != waldur_org.uuid:
+                    continue
 
-            if not project.resources_count:
-                continue
+                if not project.resources_count:
+                    continue
 
-            grafana_project_dashboard = grafana_project_dashboards_map.get(project.uuid)
-            new_dashboard = json.loads(
-                self.dashboard_template("dashboard-project")
-                .replace("$PROJECT_NAME$", project.name)
-                .replace("$DATASOURCE_METRICS_UID$", DATASOURCE_METRICS_UID)
-                .replace("$PROJECT_UUID$", project.uuid)
-            )
-            payload = {
-                "dashboard": new_dashboard,
-                "folderUid": waldur_org.uuid,
-            }
+                grafana_project_dashboard = grafana_project_dashboards_map.get(
+                    project.uuid
+                )
+                new_dashboard = json.loads(
+                    self.dashboard_template("dashboard-project")
+                    .replace("$PROJECT_NAME$", project.name)
+                    .replace("$DATASOURCE_METRICS_UID$", DATASOURCE_METRICS_UID)
+                    .replace("$PROJECT_UUID$", project.uuid)
+                )
+                payload = {
+                    "dashboard": new_dashboard,
+                    "folderUid": waldur_org.uuid,
+                }
 
-            if not grafana_project_dashboard:
-                if not DRY_RUN:
-                    self.grafana_client.create_or_update_dashboard(payload)
-                logger.info(f"Project dashboard {project.name} has been created.")
+                if not grafana_project_dashboard:
+                    if not DRY_RUN:
+                        self.grafana_client.create_or_update_dashboard(payload)
+                    logger.info(f"Project dashboard {project.name} has been created.")
 
-            elif grafana_project_dashboard:
-                if self._update_dashboards(
-                    grafana_project_dashboard, new_dashboard, payload
-                ):
-                    logger.info(f"Project dashboard {project.name} has been updated.")
-                else:
-                    logger.info(f"Project dashboard {project.name} is skipped.")
+                elif grafana_project_dashboard:
+                    if self._update_dashboards(
+                        grafana_project_dashboard, new_dashboard, payload
+                    ):
+                        logger.info(
+                            f"Project dashboard {project.name} has been updated."
+                        )
+                    else:
+                        logger.info(f"Project dashboard {project.name} is skipped.")
+            except Exception as e:
+                logger.exception(
+                    "Grafana project dashboard synchronization error (org name %s, project name %s). Message: %s.",
+                    waldur_org.name,
+                    project.name,
+                    e,
+                )
 
     @staticmethod
     def dashboard_template(template_name):
