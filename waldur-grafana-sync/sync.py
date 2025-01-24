@@ -162,6 +162,7 @@ class Sync:
                 "full_name",
                 "email",
             ],
+            "page_size": 50,
         }
 
         for item in self.waldur_client.list_users(query):
@@ -192,8 +193,17 @@ class Sync:
     @cached_property
     def waldur_projects(self):
         result = []
+        query = {
+            "page_size": 50,
+            "field": [
+                "uuid",
+                "name",
+                "customer_uuid",
+                "resources_count",
+            ],
+        }
 
-        for project in self.waldur_client.list_projects():
+        for project in self.waldur_client.list_projects(query):
             result.append(
                 Project(
                     uuid=project["uuid"],
