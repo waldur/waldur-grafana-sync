@@ -496,9 +496,6 @@ class Sync:
                 if project.customer_uuid != waldur_org.uuid:
                     continue
 
-                if not project.resources_count:
-                    continue
-
                 grafana_project_dashboard = grafana_project_dashboards_map.get(
                     project.uuid
                 )
