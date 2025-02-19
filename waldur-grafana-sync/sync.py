@@ -448,10 +448,25 @@ class Sync:
             try:
                 if waldur_org.uuid not in folder_uids:
                     continue
+
+                if not waldur_org.name:
+                    logger.warning(
+                        f"Organization {waldur_org} has no name, skipping dashboard creation"
+                    )
+                    continue
+
                 grafana_dashboard = grafana_dashboards_map.get(waldur_org.uuid)
+                logger.info(
+                    f"Loading organization dashboard template for {waldur_org.name}"
+                )
+
+                template = self.dashboard_template("dashboard-organisation-summary")
+                logger.info(
+                    f"Replacing variables for org {waldur_org.name}: CUSTOMER_NAME='{waldur_org.name}'"
+                )
+
                 new_dashboard = json.loads(
-                    self.dashboard_template("dashboard-organisation-summary")
-                    .replace("$CUSTOMER_NAME$", waldur_org.name)
+                    template.replace("$CUSTOMER_NAME$", waldur_org.name)
                     .replace("$DATASOURCE_UID$", DATASOURCE_UID)
                     .replace("$PROMETHEUS_UID$", PROMETHEUS_UID)
                 )
